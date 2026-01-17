@@ -1,0 +1,16 @@
+{
+  "scripts": {
+    "dev": "nodemon --legacy-watch --watch . --ignore node_modules --ext js,json ./server.js"
+  },
+  "dependencies": {
+    "dotenv": "^17.2.3",
+    "express": "^5.2.1",
+    "leetcode-query": "^2.0.1",
+    "mongoose": "^9.1.4",
+    "nodemon": "^3.1.11"
+  },
+  "engines": {
+    "node": ">=20.19.0"
+  },
+  "type": "module"
+}
