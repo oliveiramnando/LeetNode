@@ -24,7 +24,7 @@ export const githubCallback = async (req,res) => {
             return res.status(400).send("Invalid OAuth state");
         }
 
-        delete req.session.oauthState;
+        delete req.session.oauthstate;
 
         const tokenRes = await fetch("https://github.com/login/oauth/access_token", {
             method: "POST",
@@ -36,7 +36,7 @@ export const githubCallback = async (req,res) => {
                 client_id: process.env.GITHUB_CLIENT_ID,
                 client_secret: process.env.GITHUB_CLIENT_SECRET,
                 code,
-                redirect_uri: proceses.env.GITHUB_CALLBACK_URL
+                redirect_uri: process.env.GITHUB_CALLBACK_URL
             })
         });
 
@@ -44,6 +44,15 @@ export const githubCallback = async (req,res) => {
         const accessToken = tokenData.access_token;
 
         const userRes = await fetch("https://api.github.com/user", {
+            headers: {
+                Authorization: `Bearer ${accessToken}`,
+                Accept: "application/vnd.github+json"
+            }
+        });
+
+        const ghUser = await userRes.json();
+
+        const emailRes = await fetch("https://api.github.com/user/emails", {
             headers: {
                 Authorization: `Bearer ${accessToken}`,
                 Accept: "application/vnd.github+json"
@@ -60,11 +69,12 @@ export const githubCallback = async (req,res) => {
         req.session.user = {
             githubId: ghUser.id,
             username: ghUser.login,
-            avatarUrl: ghUser.avater_url,
+            avatarUrl: ghUser.avatar_url,
             email
         };
 
         res.redirect(`${process.env.FRONTEND_URL}/dashboard`);
+
     } catch (error) {
         return res.status(500).json({
             message: error.message
