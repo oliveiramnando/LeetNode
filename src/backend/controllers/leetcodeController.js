@@ -11,3 +11,16 @@ export const getUser = async (req,res) => {
         console.log(err);
     }
 };
+
+export const getGithubUsername = async (req, res) => {
+    try {
+        const { userName } = req.body;
+
+        const leetcode = new LeetCode();
+        const user = await leetcode.user(username);
+        
+        return res.json(user);
+    } catch (err) {
+        console.log(error);
+    }
+}
