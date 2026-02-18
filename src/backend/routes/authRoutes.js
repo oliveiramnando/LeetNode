@@ -1,12 +1,12 @@
 import express from "express";
 
 import { identifier } from '../middlewares/identification.js';
-import authController from '../controllers/authController.js';
+import { startGithubOAuth, githubCallback, logout } from '../controllers/authController.js';
 
 const router = express.Router();
 
-router.get('/github/start', authController.githubStart);
-router.get('/github/callback', authController.githubCallback);
-router.post('/signout', identifier, authController.signout);
+router.get('/github/start', startGithubOAuth);
+router.get('/github/callback', githubCallback);
+router.post('/signout', identifier, logout);
 
 export default router;
