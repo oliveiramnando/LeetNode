@@ -81,3 +81,10 @@ export const githubCallback = async (req,res) => {
         });
     }
 }
+
+export const logout = (req, res) => {
+    req.session.destroy(() => {
+        res.clearCookie("sid");
+        res.json({ ok: true });
+    });
+};
