@@ -81,10 +81,12 @@ export function deriveSolvedOverview(
 
 export type HeatmapCell = {
   date: Date;
-  iso: string; // yyyy-mm-dd
+  iso: string;
   count: number;
-  level: 0 | 1 | 2 | 3 | 4; // 0,1-2,3-5,6-9,10+
+  level: 0 | 1 | 2 | 3 | 4;
+  isFuture?: boolean; // NEW: cells after today (in the last week) should be blank like GitHub
 };
+
 
 export type HeatmapGrid = {
   weeks: number;
@@ -130,6 +132,24 @@ export function addDays(d: Date, days: number): Date {
   return x;
 }
 
+export function startOfWeekUTC(d: Date): Date {
+  // Sunday as week start (0)
+  const day = d.getUTCDay(); // 0=Sun ... 6=Sat
+  const start = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+  start.setUTCDate(start.getUTCDate() - day);
+  return start;
+}
+
+export function startOfDayUTC(d: Date): Date {
+  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), 0, 0, 0, 0));
+}
+
+export function utcDayKeySeconds(d: Date): string {
+  // key = unix seconds at 00:00:00 UTC
+  return String(Math.floor(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()) / 1000));
+}
+
+
 export function deriveYearHeatmap(
   calendarJsonString: string,
   now: Date = new Date(),
@@ -137,9 +157,9 @@ export function deriveYearHeatmap(
 ): HeatmapGrid {
   const map = parseSubmissionCalendar(calendarJsonString);
 
-  const end = startOfDay(now);
-  const totalDays = weeks * 7;
-  const start = addDays(end, -(totalDays - 1));
+  const end = startOfDayUTC(now);           // today at 00:00 UTC
+  const endWeekStart = startOfWeekUTC(end); // Sunday of current week
+  const start = addDays(endWeekStart, -(weeks - 1) * 7); // Sunday weeks-1 ago
 
   const cells: HeatmapCell[][] = Array.from({ length: 7 }, () =>
     Array.from({ length: weeks }, () => {
@@ -152,11 +172,11 @@ export function deriveYearHeatmap(
 
   for (let col = 0; col < weeks; col++) {
     for (let row = 0; row < 7; row++) {
-      const idx = col * 7 + row;
-      const date = addDays(start, idx);
+      const date = addDays(start, col * 7 + row);
 
-      const unixSeconds = Math.floor(date.getTime() / 1000);
-      const count = map[String(unixSeconds)] ?? 0;
+      const isFuture = date.getTime() > end.getTime(); // after today → blank cell
+      const key = utcDayKeySeconds(date);
+      const count = isFuture ? 0 : (map[key] ?? 0);
 
       maxCount = Math.max(maxCount, count);
 
@@ -164,7 +184,8 @@ export function deriveYearHeatmap(
         date,
         iso: formatDateISO(date),
         count,
-        level: levelForCount(count),
+        level: isFuture ? 0 : levelForCount(count),
+        isFuture,
       };
     }
   }
