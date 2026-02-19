@@ -6,6 +6,12 @@ const UserSchema = new mongoose.Schema({
         required: true,
         trim: true,
         unique: true
+    },
+    leetcodeSession: {
+        type: String,
+        trim: true,
+        unique: true,
+        select: false
     }
 }, {
     timestamps: true
