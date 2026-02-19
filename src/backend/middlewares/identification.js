@@ -1,34 +1,24 @@
-import jwt from 'jsonwebtoken';
 
 export const identifier = (req,res,next) => {
     try {
-        let raw = req.get('authorization');
-        let source = 'header';
-
-        if(!raw) {
-            raw = req.cookies?.Authorization;
-            source = 'cookie';
-        }
-
-        if (!raw || !raw.toLowerCase().startsWith('bearer ')) {
+        if (!req.session.accessToken) {
             return res.status(401).json({
-                success: false,
-                message: "Bearer token missing!"
-            })
+                success:false,
+                message: "No token provided"
+            });
         }
-
-        const token = raw.slice(7).trim();
-        const payload = jwt.verify(token, process.env.TOKEN_SECRET);
-
-        req.user = {
-            id: String(payload.userId),
-            email: payload.email
-        }
+        
         next();
     } catch (error) {
-        return res.status(401).json({
-            success:false,
-            message: "invalid or expired token"
+        if (error.response?.status === 401) {
+            delete req.session.accessToken;
+            return res.status(401).json({
+                success:false,
+                message: "invalid or expired token"
+            });
+        }
+        return res.status(500).json({
+            error: 'Failed to fetch user data'
         });
     }
 }
