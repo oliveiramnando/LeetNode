@@ -4,7 +4,6 @@ LeetNode is a full-stack web application that enhances the LeetCode experience b
 
 It integrates LeetCode data with GitHub OAuth to create verified, interactive developer profiles.
 
----
 
 ## Tech Stack
 
@@ -20,7 +19,6 @@ It integrates LeetCode data with GitHub OAuth to create verified, interactive de
 - GitHub OAuth
 - `leetcode-query` (LeetCode GraphQL wrapper)
 
----
 
 ## Authentication Flow
 
@@ -29,7 +27,6 @@ It integrates LeetCode data with GitHub OAuth to create verified, interactive de
 3. GitHub URL is matched against the user’s LeetCode profile  
 4. Session is established using cookies  
 
----
 
 ## Data Source
 
