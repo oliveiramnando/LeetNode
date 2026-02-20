@@ -1,17 +1,17 @@
 import mongoose from "mongoose";
 
 const UserSchema = new mongoose.Schema({
-    githubUrl: {
+    ghUsername: {
         type: String,
         required: true,
         trim: true,
-        unique: true
-    },
-    leetcodeSession: {
-        type: String,
-        trim: true,
         unique: true,
-        select: false
+        index: true
+    },
+    leetcodeUsername: {
+        type: String,
+        unique: true,
+        trim: true,
     }
 }, {
     timestamps: true
