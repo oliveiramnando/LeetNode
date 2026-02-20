@@ -1,4 +1,6 @@
 import { LeetCode, Credential } from "leetcode-query";
+import User from "../models/User.js";
+
 
 export const getUser = async (req,res) => {
     try {
@@ -52,14 +54,39 @@ export const me = async (req, res) => {
     }
 };
 
-export const getGithubUsername = async (req, res) => {
+export const linkLeetcode = async (req, res) => {
     try {
-        const { userName } = req.body;
+        const { username, githubUrl } = req.body;
 
         const leetcode = new LeetCode();
-        const user = await leetcode.user(username);
+        const leetcodeUser = await leetcode.user(username);
+
+        if (!leetcodeUser) {
+            return res.status(404).json({ error: "LeetCode user not found" });
+        }
+
+        let githubUrlFromLeetcode = leetcodeUser.matchedUser.githubUrl;
+        if (!githubUrlFromLeetcode) { // check if leetcode user had github url in their profile
+            return res.status(400).json({ error: "LeetCode user does not have a GitHub URL in their profile" });
+        }
+        // console.log("change to string");
+        // githubUrlFromLeetcode = githubUrlFromLeetcode.toString();
+        // console.log("after change");
+        if (githubUrlFromLeetcode !== githubUrl) { // check leetcoduser github url if it matches the one provided on request
+            return res.status(400).json({ error: "GitHub URL does not match the one in LeetCode profile" });
+        }
+
+        // look up user in db by github url, and update leetcode username
+        const user = await User.findOne({ githubUrl: githubUrl });
+        if (!user) {
+            return res.status(404).json({ error: "User not found in database" });
+        }
         
-        return res.json(user);
+        user.leetcodeUsername = username;
+        await user.save();
+
+        return res.status(200).json({ message: "LeetCode account linked successfully" });
+
     } catch (err) {
         console.log(error);
     }
