@@ -1,12 +1,13 @@
 import crypto from "crypto";
 import axios from "axios";
+import User from "../models/User.js";
 
 const {
     GITHUB_CLIENT_ID,
     GITHUB_CLIENT_SECRET,
     REDIRECT_URI,
     FRONTEND_URL,
-    NODE_ENV,
+    NODE_ENV
 } = process.env;
 
 function assertEnv() {
@@ -35,9 +36,14 @@ export const startGithubOAuth = (req, res) => {
         const state = crypto.randomBytes(16).toString("hex");
         req.session.oauthState = state;
 
-        // Optional but helps some session stores persist before redirect:
+
         req.session.save((err) => {
-        if (err) return res.status(500).json({ message: "Failed to save session" });
+            if (err) return res.status(500).json({ message: "Failed to save session" });
+
+            // console.log("START: sessionID =", req.sessionID);
+            // console.log("START: oauthState stored =", req.session.oauthState);
+            // console.log("START: full session =", req.session);
+
             return res.redirect(buildGithubAuthorizeUrl(state));
         });
     } catch (err) {
@@ -58,13 +64,18 @@ export const githubCallback = async (req, res) => {
         if (!code) return res.status(400).send("Missing code parameter");
         if (!state) return res.status(400).send("Missing state parameter");
 
+        // console.log("CALLBACK: sessionID =", req.sessionID);
+        // console.log("CALLBACK: state from query =", state);
+        // console.log("CALLBACK: session.oauthState =", req.session.oauthState);
+        // console.log("CALLBACK: full session =", req.session);
+
         const expectedState = req.session.oauthState;
         if (!expectedState || state !== expectedState) {
             return res.status(400).send("Invalid OAuth state");
         }
         delete req.session.oauthState;
 
-        // Exchange code -> access token
+
         const tokenRes = await axios.post(
             "https://github.com/login/oauth/access_token",
             {
@@ -89,7 +100,6 @@ export const githubCallback = async (req, res) => {
             return res.status(400).json({ message: "No access token returned from GitHub" });
         }
 
-        // Fetch GitHub user
         const userRes = await axios.get("https://api.github.com/user", {
             headers: {
                 Authorization: `Bearer ${accessToken}`,
@@ -100,7 +110,6 @@ export const githubCallback = async (req, res) => {
 
         const ghUser = userRes.data;
 
-        // Fetch emails (optional)
         let primaryEmail = null;
         try {
             const emailsRes = await axios.get("https://api.github.com/user/emails", {
@@ -121,7 +130,6 @@ export const githubCallback = async (req, res) => {
             // ignore
         }
 
-        // Create your app session
         req.session.user = {
             provider: "github",
             githubId: ghUser.id,
@@ -132,8 +140,18 @@ export const githubCallback = async (req, res) => {
             email: primaryEmail || ghUser.email || null,
         };
 
+        const ghUsername = ghUser.login;
+
+        await User.findOneAndUpdate(
+            { ghUsername },
+            { $setOnInsert: { ghUsername } },
+            { new: true, upsert: true }
+        );
+
         req.session.save((err) => {
             if (err) return res.status(500).send("Internal Server Error");
+
+            console.log("START session data after save:", req.session);
             return res.redirect(FRONTEND_URL);
         });
     } catch (err) {
@@ -143,16 +161,16 @@ export const githubCallback = async (req, res) => {
 };
 
 export const logout = (req, res) => {
-  req.session.destroy((err) => {
-    if (err) return res.status(500).json({ message: "Failed to destroy session" });
+    const isProd = process.env.NODE_ENV === "production";
+    req.session.destroy((err) => {
+        if (err) return res.status(500).json({ message: "Failed to destroy session" });
 
-    // Must match your session cookie name: you set name: "sid" in config/session.js
-    res.clearCookie("sid", {
-      httpOnly: true,
-      sameSite: "lax",
-      secure: NODE_ENV === "production",
+        res.clearCookie("sid", {
+            httpOnly: true,
+            sameSite: isProd ? "none" : "lax",
+            secure: isProd,
+        });
+
+        return res.json({ ok: true });
     });
-
-    return res.json({ ok: true });
-  });
 };
