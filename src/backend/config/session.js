@@ -19,7 +19,8 @@ export default session({
     store: MongoStore.create({
         mongoUrl: process.env.MONGO_URI,
         collectionName: "sessions",
-        ttl: 60 * 60 * 24 * 7, // 7 days
+        // ttl: 60 * 60 * 24 * 7, // 7 days
+        ttl: 60 * 1, // 1 minute for testing
     }),
 
     proxy: isProd,
@@ -27,6 +28,7 @@ export default session({
         httpOnly: true,
         sameSite: isProd ? "none" : "lax",
         secure: isProd,
-        maxAge: 1000 * 60 * 60 * 24 * 7,
+        // maxAge: 1000 * 60 * 60 * 24 * 7, // 7 days
+        maxAge: 1000 * 60 * 1, // 1 minute for testing
     },
 });
