@@ -8,6 +8,13 @@ const UserSchema = new mongoose.Schema({
         unique: true,
         index: true
     },
+    githubUrl: {
+        type: String,
+        required: true,
+        trim: true,
+        unique: true,
+        index: true
+    },
     leetcodeUsername: {
         type: String,
         unique: true,
