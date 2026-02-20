@@ -141,11 +141,19 @@ export const githubCallback = async (req, res) => {
         };
 
         const ghUsername = ghUser.login;
+        const githubUrl = ghUser.html_url;
 
+        console.log("creating / updaing user in db")
         await User.findOneAndUpdate(
             { ghUsername },
-            { $setOnInsert: { ghUsername } },
-            { new: true, upsert: true }
+            {
+                $set: { githubUrl },
+                $setOnInsert: { ghUsername }
+            },
+            {
+                new: true,
+                upsert: true
+            }
         );
 
         req.session.save((err) => {
