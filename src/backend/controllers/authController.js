@@ -143,8 +143,7 @@ export const githubCallback = async (req, res) => {
         const ghUsername = ghUser.login;
         const githubUrl = ghUser.html_url;
 
-        console.log("creating / updaing user in db")
-        await User.findOneAndUpdate(
+        const user = await User.findOneAndUpdate(
             { ghUsername },
             {
                 $set: { githubUrl },
@@ -156,10 +155,10 @@ export const githubCallback = async (req, res) => {
             }
         );
 
+        req.session.userId = user._id.toString();
+
         req.session.save((err) => {
             if (err) return res.status(500).send("Internal Server Error");
-
-            console.log("START session data after save:", req.session);
             return res.redirect(FRONTEND_URL);
         });
     } catch (err) {
@@ -182,3 +181,40 @@ export const logout = (req, res) => {
         return res.json({ ok: true });
     });
 };
+
+export const signup = async (req,res) => {
+    try {
+        const { name } = req.body;
+        const newUser = new User({
+            name: name
+        });
+
+        const result = await newUser.save();
+        res.status(200).json({
+            success: true,
+            message: "Your account has been successfully created!",
+            user: result
+        });
+    } catch (error) {
+        return res.status(500).json({
+            message: error.message
+        });
+    }
+}
+export const signin = async (req,res) => {
+    try {
+        const { name } = req.body;
+        const existingUSer = await User.findOne({
+            name: name
+        });
+
+        res.status(200).json({
+            success: true,
+            existingUSer
+        });
+    } catch (error) {
+        return res.status(500).json({
+            message: error.message
+        });
+    }
+}
