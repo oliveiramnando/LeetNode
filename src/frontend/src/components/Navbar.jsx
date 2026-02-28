@@ -94,7 +94,7 @@ export default function Navbar() {
             </>
           ) : (
             <>
-              <span className="text-zinc-400">{user.username}</span>
+              <span className="text-zinc-400">{user.leetcodeUsername}</span>
 
               <button
                 type="button"
