@@ -74,38 +74,44 @@ export const me = async (req, res) => {
 
 export const linkLeetcode = async (req, res) => {
     try {
-        const { username, githubUrl } = req.body;
+        const userId = req.session?.userId;
+        if (!userId) return res.status(400).json({ message: "user not logged in "});
+
+        const user = await User.findById(userId);
+        if (!user) return res.status(404).json({ error: "Session user not found" });
+        
+        const leetcodeUsername = (req.body?.leetcodeUsername || "").trim();
+        if (!leetcodeUsername) return res.status(400).json({ message: "Leetcode username is required"})
 
         const leetcode = new LeetCode();
-        const leetcodeUser = await leetcode.user(username);
+        const leetcodeUser = await leetcode.user(leetcodeUsername);
 
-        if (!leetcodeUser) {
-            return res.status(404).json({ error: "LeetCode user not found" });
-        }
+        if (!leetcodeUser) return res.status(404).json({ error: "LeetCode user not found" });
+    
+        const githubUrlFromLeetcode = leetcodeUser?.matchedUser?.githubUrl || null;
+         // check if leetcode user had github url in their profile
+        if (!githubUrlFromLeetcode) return res.status(400).json({ error: "LeetCode user does not have a GitHub URL in their profile" });
 
-        let githubUrlFromLeetcode = leetcodeUser.matchedUser.githubUrl;
-        if (!githubUrlFromLeetcode) { // check if leetcode user had github url in their profile
-            return res.status(400).json({ error: "LeetCode user does not have a GitHub URL in their profile" });
-        }
-        // console.log("change to string");
-        // githubUrlFromLeetcode = githubUrlFromLeetcode.toString();
-        // console.log("after change");
-        if (githubUrlFromLeetcode !== githubUrl) { // check leetcoduser github url if it matches the one provided on request
-            return res.status(400).json({ error: "GitHub URL does not match the one in LeetCode profile" });
-        }
-
-        // look up user in db by github url, and update leetcode username
-        const user = await User.findOne({ githubUrl: githubUrl });
-        if (!user) {
-            return res.status(404).json({ error: "User not found in database" });
-        }
+        // check leetcoduser github url if it matches the one provided on request
+        if (githubUrlFromLeetcode !== user.githubUrl) return res.status(400).json({ error: "GitHub URL does not match the one in LeetCode profile" });
         
-        user.leetcodeUsername = username;
+        user.leetcodeUsername = leetcodeUsername;
         await user.save();
 
-        return res.status(200).json({ message: "LeetCode account linked successfully" });
+        return res.status(200).json({
+            success: true,
+            message: "LeetCode account linked successfully",
+            user: {
+                id: user?._id,
+                leetcodeUsername: user.leetcodeUsername
+            }
+        });
 
-    } catch (err) {
-        console.log(error);
+    } catch (error) {
+        if (error?.code === 11000) {
+            return res.status(409).json({ message: "That LeetCode username is already linked to another account." });
+        }
+        console.error("linkLeetcode error:", error);
+        return res.status(500).json({ message: "Server error" });
     }
 }
