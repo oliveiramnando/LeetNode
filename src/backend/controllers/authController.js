@@ -110,7 +110,7 @@ export const githubOAuthCallback = async (req, res) => {
 
             req.session.userId = user?._id;
             if (!user.leetcodeUsername) return res.redirect(`${process.env.FRONTEND_URL}/link-account`);
-            return res.redirect(`${process.env.FRONTEND_URL}/profile/${encodeURIComponenet(user.leetcodeUsername)}`);
+            return res.redirect(`${process.env.FRONTEND_URL}/profile/${encodeURIComponent(user.leetcodeUsername)}`);
         })
 
     } catch (error) {
