@@ -1,10 +1,10 @@
 import "./env.js"; 
-
 import express from "express";
 
 import corsMiddleware from "./config/cors.js";
 import sessionMiddleware from "./config/session.js";
-import { connectDB } from "./config/db.js";
+import connectDB from "./config/db.js";
+
 import authRoutes from "./routes/authRoutes.js";
 import leetcodeRoutes from "./routes/leetcodeRoute.js";
 
