@@ -2,6 +2,34 @@ import crypto from "crypto";
 import axios from "axios";
 import User from "../models/User.js";
 
+export const me = async (req,res) =>{
+    try {
+        const userId = req.session?.userId
+        if (!userId) return res.status(401).json({ loggedIn: false });
+
+        const dbUser = await User.findById(userId).lean();
+        if (!dbUser) {
+            // This shouldn't happen - session exists but user not found. Clear session to be safe.
+            req.session.destroy(() => {
+                return res.status(401).json({ loggedIn: false });
+            });
+            return;
+        }
+        return res.json({ 
+            loggedIn: true, 
+            user: {
+                id: dbUser._id,
+                githubID: dbUser.githubID,
+                githubUsername: dbUser.githubUsername,
+                githubUrl: dbUser.githubUrl,
+                leetcodeUsername: dbUser.leetcodeUsername ?? null,
+            }
+        });
+    } catch (err) {
+        return res.status(500).json({ message: "Server error" });
+    }
+}
+
 export const startGithubOAuth = async (req, res) => {
     try {
         const state = crypto.randomBytes(16).toString("hex");
@@ -77,19 +105,26 @@ export const githubOAuthCallback = async (req, res) => {
             }
         );
 
-        req.session.userId = user?._id;
+        req.session.regenerate((err) => { // generatees new session and destroys old one
+            if (err) return res.status(500).json({ message: "Failed to create session" });
 
-        if (!user.leetcodeUsername){
-            return res.redirect(`${process.env.FRONTEND_URL}/link-account`);
-        } 
-
-        return res.redirect(`${process.env.FRONTEND_URL}/profile/${user.leetcodeUsername}`);
+            req.session.userId = user?._id;
+            if (!user.leetcodeUsername) return res.redirect(`${process.env.FRONTEND_URL}/link-account`);
+            return res.redirect(`${process.env.FRONTEND_URL}/profile/${encodeURIComponenet(user.leetcodeUsername)}`);
+        })
 
     } catch (error) {
         return res.status(500).json({
             message: error.message
         });
     }
+}
+
+export const logout = async (req,res) => {
+    req.session.destroy(() => {
+        return res.status(401).json({ loggedIn: false });
+    });
+    return;
 }
 
 export const signup = async (req,res) => {
