@@ -11,9 +11,6 @@ router.post("/signout", logout);
 
 router.post("/signup", signup);
 router.post("/signin", signin);
-// router.post("/signout", (req, res) => {
-//   console.log("HIT /api/auth/signout");
-//   return res.json({ ok: true });
-// });
+
 
 export default router;
