@@ -4,19 +4,39 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 function useLoggedInUsername() {
-  // TEMP approach: localStorage, fallback to hardcoded placeholder.
-  // Swap later with /api/me when auth is finalized.
-  const FALLBACK = "N3m0lives";
-  const [username, setUsername] = useState(FALLBACK);
+  const backend = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8080";
+  const meUrl = `${backend}/api/auth/me`;
+
+  const [username, setUsername] = useState("");
 
   useEffect(() => {
-    try {
-      const stored = localStorage.getItem("leetnode_username");
-      if (stored && stored.trim()) setUsername(stored.trim());
-    } catch {
-      // localStorage might be blocked; keep fallback
-    }
-  }, []);
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const res = await fetch(meUrl, {
+          credentials: "include",
+          headers: { Accept: "application/json" },
+          cache: "no-store",
+        });
+
+        if (!res.ok) return;
+
+        const data = await res.json();
+        const leetcodeUsername = data?.user?.leetcodeUsername;
+
+        if (!cancelled && leetcodeUsername) {
+          setUsername(leetcodeUsername);
+        }
+      } catch {
+        // ignore
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [meUrl]);
 
   return username;
 }
@@ -28,12 +48,15 @@ export default function ProfileButton() {
   return (
     <button
       type="button"
-      onClick={() => router.push(`/profile/${encodeURIComponent(username)}`)}
-      className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-white/10 bg-white/5 text-zinc-200 transition hover:bg-white/10"
+      onClick={() => {
+        if (!username) return;   // prevent navigating to /profile/undefined
+        router.push(`/profile/${encodeURIComponent(username)}`);
+      }}
+      disabled={!username}
+      className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-white/10 bg-white/5 text-zinc-200 transition hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed"
       aria-label="Go to profile"
-      title="Profile"
+      title={username ? "Profile" : "Not logged in"}
     >
-      {/* Simple user icon (no dropdown) */}
       <svg
         xmlns="http://www.w3.org/2000/svg"
         viewBox="0 0 24 24"
