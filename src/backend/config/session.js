@@ -1,34 +1,16 @@
 import session from "express-session";
-import MongoStore from "connect-mongo";
-
-if (!process.env.SESSION_SECRET) {
-    throw new Error("SESSION_SECRET is missing. Check your .env loading/path.");
-}
-if (!process.env.MONGO_URI) {
-    throw new Error("MONGO_URI is missing.");
-}
-
-const isProd = process.env.NODE_ENV === "production";
 
 export default session({
-    name: "sid",
     secret: process.env.SESSION_SECRET,
     resave: false,
-    saveUninitialized: false,
+    saveUninitialized: false, // only get sesion when you store something
 
-    store: MongoStore.create({
-        mongoUrl: process.env.MONGO_URI,
-        collectionName: "sessions",
-        // ttl: 60 * 60 * 24 * 7, // 7 days
-        ttl: 60 * 2, // 2 minutes for testing
-    }),
-
-    proxy: isProd,
+    name: "sid",
     cookie: {
         httpOnly: true,
-        sameSite: isProd ? "none" : "lax",
-        secure: isProd,
-        // maxAge: 1000 * 60 * 60 * 24 * 7, // 7 days
-        maxAge: 1000 * 60 * 2, // 2 minutes for testing
-    },
-});
+        //maxAge: 1000 * 60 * 60 * 24 * 7, // 7 days
+        maxAge: 1000 * 60 * 5 , // 5 minutes for testing
+        sameSite: 'lax', // fine for now, switch to none in prod
+        secure: process.env.NODE_ENV === 'production', // should be tru in prod
+    }
+})
