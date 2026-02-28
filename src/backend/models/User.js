@@ -4,23 +4,31 @@ const UserSchema = new mongoose.Schema({
     name : {
         type: String
     },
-    ghUsername: {
+    githubID:{
+        type: Number,
+        // required: true,
+        trim: true,
+        // unique: true,
+        index: true
+    },
+    githubUsername: {
         type: String,
-        required: true,
+        // required: true,
         trim: true,
         unique: true,
         index: true
     },
     githubUrl: {
         type: String,
-        required: true,
+        // required: true,
         trim: true,
-        unique: true,
+        // unique: true,
         index: true
     },
     leetcodeUsername: {
         type: String,
         unique: true,
+        sparse: true, // allows multiple docs with null/undefined leetcodeUsername
         trim: true,
     }
 }, {
