@@ -2,185 +2,95 @@ import crypto from "crypto";
 import axios from "axios";
 import User from "../models/User.js";
 
-const {
-    GITHUB_CLIENT_ID,
-    GITHUB_CLIENT_SECRET,
-    REDIRECT_URI,
-    FRONTEND_URL,
-    NODE_ENV
-} = process.env;
-
-function assertEnv() {
-    const missing = [];
-    if (!GITHUB_CLIENT_ID) missing.push("GITHUB_CLIENT_ID");
-    if (!GITHUB_CLIENT_SECRET) missing.push("GITHUB_CLIENT_SECRET");
-    if (!REDIRECT_URI) missing.push("REDIRECT_URI");
-    if (!FRONTEND_URL) missing.push("FRONTEND_URL");
-    if (missing.length) throw new Error(`Missing env vars: ${missing.join(", ")}`);
-}
-
-function buildGithubAuthorizeUrl(state) {
-    const params = new URLSearchParams({
-        client_id: GITHUB_CLIENT_ID,
-        redirect_uri: REDIRECT_URI,
-        scope: "read:user user:email",
-        state,
-    });
-  return `https://github.com/login/oauth/authorize?${params.toString()}`;
-}
-
-export const startGithubOAuth = (req, res) => {
+export const startGithubOAuth = async (req, res) => {
     try {
-        assertEnv();
-
         const state = crypto.randomBytes(16).toString("hex");
-        req.session.oauthState = state;
+        req.session.oAuthState = state;
 
-
-        req.session.save((err) => {
-            if (err) return res.status(500).json({ message: "Failed to save session" });
-
-            // console.log("START: sessionID =", req.sessionID);
-            // console.log("START: oauthState stored =", req.session.oauthState);
-            // console.log("START: full session =", req.session);
-
-            return res.redirect(buildGithubAuthorizeUrl(state));
+        const params = new URLSearchParams({
+            client_id: process.env.GITHUB_CLIENT_ID,
+            redirect_uri: process.env.GITHUB_REDIRECT_URI,
+            scope: "read:user user:email",
+            state: state
         });
-    } catch (err) {
-        return res.status(500).json({ message: err.message });
-    }
-};
 
-export const githubCallback = async (req, res) => {
+        return res.redirect(`https://github.com/login/oauth/authorize/?${params.toString()}`);
+
+    } catch (error) {
+        return res.status(500).json({
+            message: error.message
+        });
+    }
+}
+
+export const githubOAuthCallback = async (req, res) => {
     try {
-        assertEnv();
+        const { code, state } = req.query;
 
-        const { code, state, error, error_description } = req.query;
-
-        if (error) {
-            return res.status(400).send(`GitHub OAuth error: ${error_description || error}`);
-        }
-
-        if (!code) return res.status(400).send("Missing code parameter");
-        if (!state) return res.status(400).send("Missing state parameter");
-
-        // console.log("CALLBACK: sessionID =", req.sessionID);
-        // console.log("CALLBACK: state from query =", state);
-        // console.log("CALLBACK: session.oauthState =", req.session.oauthState);
-        // console.log("CALLBACK: full session =", req.session);
-
-        const expectedState = req.session.oauthState;
-        if (!expectedState || state !== expectedState) {
-            return res.status(400).send("Invalid OAuth state");
-        }
-        delete req.session.oauthState;
-
-
-        const tokenRes = await axios.post(
-            "https://github.com/login/oauth/access_token",
-            {
-                client_id: GITHUB_CLIENT_ID,
-                client_secret: GITHUB_CLIENT_SECRET,
-                code,
-                redirect_uri: REDIRECT_URI,
-                state,
-            }, {
-                headers: { Accept: "application/json" },
-                timeout: 15000,
-            }
-        );
-
-        const tokenData = tokenRes.data;
-        if (tokenData.error) {
-            return res.status(400).json({ message: "Failed to obtain access token", details: tokenData });
-        }
-
-        const accessToken = tokenData.access_token;
-        if (!accessToken) {
-            return res.status(400).json({ message: "No access token returned from GitHub" });
-        }
-
-        const userRes = await axios.get("https://api.github.com/user", {
-            headers: {
-                Authorization: `Bearer ${accessToken}`,
-                Accept: "application/vnd.github+json",
-            },
-            timeout: 15000,
-        });
-
-        const ghUser = userRes.data;
-
-        let primaryEmail = null;
-        try {
-            const emailsRes = await axios.get("https://api.github.com/user/emails", {
-                headers: {
-                    Authorization: `Bearer ${accessToken}`,
-                    Accept: "application/vnd.github+json",
-                },
-                timeout: 15000,
+        if (state !== req.session.oAuthState) {
+            return res.status(400).json({
+                success: false,
+                message: "Security validation failed. Please try logging in again"
             });
+        }  
 
-            const emails = Array.isArray(emailsRes.data) ? emailsRes.data : [];
-            primaryEmail =
-                emails.find((e) => e.primary && e.verified)?.email ||
-                emails.find((e) => e.verified)?.email ||
-                emails[0]?.email ||
-                null;
-            } catch {
-            // ignore
+        delete req.session.oAuthState;
+
+        const params = new URLSearchParams({
+            client_id: process.env.GITHUB_CLIENT_ID,
+            client_secret: process.env.GITHUB_CLIENT_SECRET,
+            code,
+            redirect_uri: process.env.GITHUB_REDIRECT_URI
+        });
+         
+        let config = {
+            headers: {
+                Accept: 'application/json'
+            }
         }
 
-        req.session.user = {
-            provider: "github",
-            githubId: ghUser.id,
-            username: ghUser.login,
-            name: ghUser.name || null,
-            avatarUrl: ghUser.avatar_url || null,
-            profileUrl: ghUser.html_url || null,
-            email: primaryEmail || ghUser.email || null,
-        };
+        const userData = await axios.post('https://github.com/login/oauth/access_token/', params, config);  
+        const accessToken = userData.data.access_token;
 
-        const ghUsername = ghUser.login;
-        const githubUrl = ghUser.html_url;
+        config = {
+            headers:{
+                'Authorization': `Bearer ${accessToken}`,
+                'Accept': 'application/json'
+            }
+        }
+        const userGithubData = await axios.get(`https://api.github.com/user`, config);
+        const githubUsername = userGithubData.data.login;
+        const githubUrl = userGithubData.data.html_url;
+        const githubID = userGithubData.data.id
+        // console.log(userGithubData);
 
-        const user = await User.findOneAndUpdate(
-            { ghUsername },
+        // creating new user/login
+        const user = await User.findOneAndUpdate( { githubID },
             {
-                $set: { githubUrl },
-                $setOnInsert: { ghUsername }
-            },
-            {
+                githubID,
+                githubUsername,
+                githubUrl
+            },{
+                upsert: true,
                 new: true,
-                upsert: true
+
             }
         );
 
-        req.session.userId = user._id.toString();
+        req.session.userId = user?._id;
 
-        req.session.save((err) => {
-            if (err) return res.status(500).send("Internal Server Error");
-            return res.redirect(FRONTEND_URL);
+        if (!user.leetcodeUsername){
+            return res.redirect(`${process.env.FRONTEND_URL}/link-account`);
+        } 
+
+        return res.redirect(`${process.env.FRONTEND_URL}/profile/${user.leetcodeUsername}`);
+
+    } catch (error) {
+        return res.status(500).json({
+            message: error.message
         });
-    } catch (err) {
-        console.error(err);
-        return res.status(500).json({ message: err.message });
     }
-};
-
-export const logout = (req, res) => {
-    const isProd = process.env.NODE_ENV === "production";
-    req.session.destroy((err) => {
-        if (err) return res.status(500).json({ message: "Failed to destroy session" });
-
-        res.clearCookie("sid", {
-            httpOnly: true,
-            sameSite: isProd ? "none" : "lax",
-            secure: isProd,
-        });
-
-        return res.json({ ok: true });
-    });
-};
+}
 
 export const signup = async (req,res) => {
     try {
@@ -201,6 +111,7 @@ export const signup = async (req,res) => {
         });
     }
 }
+
 export const signin = async (req,res) => {
     try {
         const { name } = req.body;
