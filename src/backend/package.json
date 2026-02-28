@@ -15,7 +15,7 @@
     "jsonwebtoken": "^9.0.3",
     "leetcode-query": "^2.0.1",
     "mongoose": "^9.1.4",
-    "nodemon": "^1.0.2"
+    "nodemon": "^1.19.4"
   },
   "engines": {
     "node": ">=20.19.0"
