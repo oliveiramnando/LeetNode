@@ -10,8 +10,11 @@ export const getUser = async (req,res) => {
         const user = await leetcode.user(username);
 
         return res.json(user);
-    } catch (err) {
-        console.log(err);
+    } catch (error) {
+        console.log(error);
+        return res.status(500).json({
+            message: error.message
+        });
     }
 };
 
@@ -66,9 +69,11 @@ export const me = async (req, res) => {
 
         return res.status(200).json(user);
 
-    } catch (err) {
-        console.error(err);
-        return res.status(500).json({ error: "Server error" });
+    } catch (error) {
+        console.log(error);
+        return res.status(500).json({
+            message: error.message
+        });
     }
 };
 
