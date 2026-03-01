@@ -1,5 +1,5 @@
 import express from "express";
-import { follow, unfollow } from "../controllers/friendController.js";
+import { follow, unfollow, getFollowers, getFollowing } from "../controllers/friendController.js";
 
 const router = express.Router();
 
@@ -7,7 +7,7 @@ const router = express.Router();
 router.post('/follow', follow);
 router.delete('/unfollow', unfollow);
 
-router.get('followers');
-router.get('following');
+router.get('/followers', getFollowers);
+router.get('/following', getFollowing);
 
 export default router;
