@@ -25,8 +25,11 @@ export const me = async (req,res) =>{
                 leetcodeUsername: dbUser.leetcodeUsername ?? null,
             }
         });
-    } catch (err) {
-        return res.status(500).json({ message: "Server error" });
+    } catch (error) {
+        console.log(error);
+        return res.status(500).json({
+            message: error.message
+        });
     }
 }
 
@@ -54,8 +57,15 @@ export const startGithubOAuth = async (req, res) => {
 export const githubOAuthCallback = async (req, res) => {
     try {
         const { code, state } = req.query;
+        if (!code) {
+            return res.status(400).json({
+                success:false,
+                message: "Missing oAuth code"
+            });
+        }
 
-        if (state !== req.session.oAuthState) {
+        const expectedState = req.session.oAuthState;
+        if (!expectedState || state !== expectedState) {
             return res.status(400).json({
                 success: false,
                 message: "Security validation failed. Please try logging in again"
@@ -92,6 +102,10 @@ export const githubOAuthCallback = async (req, res) => {
         const githubID = userGithubData.data.id
         // console.log(userGithubData);
 
+        if (!githubID) {
+            return res.status(400).json({ success: false, message: "Github ID missing" });
+        }
+
         // creating new user/login
         const user = await User.findOneAndUpdate( { githubID },
             {
@@ -109,6 +123,10 @@ export const githubOAuthCallback = async (req, res) => {
             if (err) return res.status(500).json({ message: "Failed to create session" });
 
             req.session.userId = user?._id;
+            if (user.leetcodeUsername) {
+                req.session.leetcodeUsername = user.leetcodeUsername;
+            }
+
             if (!user.leetcodeUsername) return res.redirect(`${process.env.FRONTEND_URL}/link-account`);
             return res.redirect(`${process.env.FRONTEND_URL}/profile/${encodeURIComponent(user.leetcodeUsername)}`);
         })
