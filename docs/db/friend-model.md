@@ -1,4 +1,4 @@
-# db/friend-model.md
+# Friend Model
 
 ## Source of Truth
 
