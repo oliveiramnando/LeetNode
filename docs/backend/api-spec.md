@@ -1,189 +1,612 @@
-# API Specification
+# Backend API Specification
 
 This document describes the HTTP API exposed by the LeetNode backend.
 
-- **Base URL (local):** `http://localhost:<PORT>`
-- **API Prefix:** `/api`
-- **Content Type:** JSON unless otherwise noted (redirects)
-- **Auth Model:** Session-based (cookie). Some routes rely on environment variables instead of user auth.
+- Base prefix: `/api`
+- Auth model: session-based (cookie via `express-session`)
+- CORS: configured to allow `FRONTEND_URL` with credentials enabled
 
+---
 
-## Conventions
+## Route Map
 
-### Standard Response Types
-Most endpoints respond with JSON. Some auth endpoints respond with **redirects**.
+### Health
+- GET `/api/health`
 
-### Sessions & Cookies
-The backend uses server-side sessions (stored in MongoDB) and sets a session cookie for the client.
-- Requests from the frontend should include credentials (cookies).
+### Auth
+- GET `/api/auth/me`
+- GET `/api/auth/github/start`
+- GET `/api/auth/github/callback`
+- POST `/api/auth/signup`
+- POST `/api/auth/signin`
+- POST `/api/auth/signout`
 
-### CORS
-CORS allows requests from `FRONTEND_URL` with credentials enabled.
+### LeetCode
+- GET `/api/leetcode/me`
+- GET `/api/leetcode/user/:username`
+- POST `/api/leetcode/link-account`
 
-### Error Handling (Current Behavior)
-Error response formats are currently inconsistent across endpoints:
-- Some routes return JSON errors.
-- Some routes return plain text.
-- Some routes log errors without responding.
+### Friend (Follow System)
+- POST `/api/friend/:leetcodeUsername/follow`
+- DELETE `/api/friend/:leetcodeUsername/follow`
+- GET `/api/friend/counts`
+- GET `/api/friend/is-following/:leetcodeUsername`
+- GET `/api/friend/followers`
+- GET `/api/friend/following`
 
-This spec documents **current behavior**.
-
-
-## Global Middleware
-
-Applied to all routes (based on backend configuration):
-- `express.json()` — parses JSON request bodies
-- CORS configured for `FRONTEND_URL` with credentials
-- Session middleware with MongoDB store
+---
 
 ## Health
 
-`GET /api/health`
-Basic health check.
+### GET /api/health
 
-**Auth:** None  
-**Request:** No params/body  
+Public health check endpoint.
 
-**Responses**
-- `200 OK`
-  ```json
-  { "ok": true }
+#### Auth
+None
+
+#### Request
+- Params: none
+- Query: none
+- Body: none
+
+#### Success Response (200)
+Returns a simple OK payload.
+
+Example:
+{ "ok": true }
+
+---
 
 ## Auth
 
-#### `GET /api/auth/me`
-Checks whether a user is logged in via session.
+### GET /api/auth/me
 
-Auth: Session (implicit)
-Request: No params/body
+Returns session-authenticated user info.
 
-Responses
-- 200 OK (logged in)
-  - Body (JSON): { "loggedIn": true, "user": {} }
-- 401 Unauthorized (not logged in)
-  - Body (JSON): { "loggedIn": false }
+#### Auth
+Session required:
+- `req.session.userId` must exist
 
+#### Request
+- Params: none
+- Query: none
+- Body: none
 
-#### `GET /api/auth/github/start`
-Starts GitHub OAuth by redirecting the user to GitHub’s authorization URL.
+#### Success Response (200)
+Example:
+{
+  "loggedIn": true,
+  "user": {
+    "id": "<userId>",
+    "githubID": 12345,
+    "githubUsername": "<string>",
+    "githubUrl": "<string>",
+    "leetcodeUsername": "<string or null>"
+  }
+}
 
-Auth: None
-Request: No params/body
+#### Error Responses
+- 401
+  - { "loggedIn": false }
+- 500
+  - { "message": "<error.message>" }
 
-Responses
-- 302 Found (redirect to GitHub OAuth URL)
-- 500 Internal Server Error (session save failure; response body may vary)
+#### Notes
+- If a session exists but the DB user record is missing, the server destroys the session.
 
+---
 
-#### `GET /api/auth/github/callback`
-Handles the GitHub OAuth callback:
-- Validates state
-- Exchanges code for token
-- Fetches GitHub user data
-- Stores user/session in DB
-- Redirects to FRONTEND_URL on success
+### GET /api/auth/github/start
 
-Auth: None (OAuth callback endpoint)
+Initiates GitHub OAuth by redirecting to GitHub authorize URL.
 
-Query Parameters
-- code (string) — required on success
-- state (string) — required
-- error (string) — optional
-- error_description (string) — optional
+#### Auth
+None
 
-Responses
-- 302 Found (redirect to FRONTEND_URL)
-- 400 Bad Request (invalid params/state mismatch; body may vary)
-- 500 Internal Server Error (OAuth exchange failure; body may vary)
+#### Request
+- Params: none
+- Query: none
+- Body: none
 
+#### Success Response
+- 302 redirect to GitHub authorize URL
+- Stores OAuth state in session:
+  - `req.session.oAuthState` (random hex string)
 
-#### `POST /api/auth/signout`
-Destroys the session and clears the session cookie.
+#### Error Responses
+- 500
+  - { "message": "<error.message>" }
 
-Auth: None
-Request: No body
+---
 
-Responses
-- 200 OK
-  - Body (JSON): { "ok": true }
-- 500 Internal Server Error (session destroy failure; body may vary)
+### GET /api/auth/github/callback
+
+Handles GitHub OAuth callback, validates state, exchanges code for token, fetches GitHub user profile, upserts DB user, and creates a logged-in session.
+
+#### Auth
+Requires OAuth state validation:
+- `state` query param must match `req.session.oAuthState`
+
+#### Request
+- Params: none
+- Query:
+  - code (required)
+  - state (required)
+- Body: none
+
+#### Success Response
+- 302 redirect:
+  - If LeetCode NOT linked: `${FRONTEND_URL}/link-account`
+  - If LeetCode linked: `${FRONTEND_URL}/profile/${encodeURIComponent(leetcodeUsername)}`
+
+Also:
+- Regenerates session (session fixation mitigation)
+- Sets session:
+  - `req.session.userId = <User._id>`
+  - `req.session.leetcodeUsername = user.leetcodeUsernameLower` (if present)
+
+#### Error Responses
+- 400
+  - { "success": false, "message": "Missing oAuth code" }
+- 400
+  - { "success": false, "message": "Security validation failed. Please try logging in again" }
+- 400
+  - { "success": false, "message": "Github ID missing" }
+- 500
+  - { "message": "<error.message>" }
+- 500
+  - { "message": "Failed to create session" }
+
+#### Notes
+- Exchanges `code` for access token using GitHub OAuth endpoint.
+- Fetches user data from `https://api.github.com/user`.
+- Upserts User document with: githubID, githubUsername, githubUrl.
+
+---
+
+### POST /api/auth/signup
+
+Creates a new user by name.
+
+#### Auth
+None
+
+#### Request
+Body:
+- name (required)
+
+#### Success Response (200)
+Example:
+{
+  "success": true,
+  "message": "Your account has been successfully created!",
+  "user": { "<full User document>" }
+}
+
+#### Error Responses
+- 500
+  - { "message": "<error.message>" }
+
+#### Notes
+- This endpoint is not integrated with the GitHub OAuth session login flow.
+
+---
+
+### POST /api/auth/signin
+
+Finds a user by name.
+
+#### Auth
+None
+
+#### Request
+Body:
+- name (required)
+
+#### Success Response (200)
+Example:
+{
+  "success": true,
+  "existingUSer": { "<User document or null>" }
+}
+
+#### Error Responses
+- 500
+  - { "message": "<error.message>" }
+
+#### Notes
+- This endpoint does not create a session.
+- Response key contains a typo: `existingUSer`.
+
+---
+
+### POST /api/auth/signout
+
+Destroys the current session.
+
+#### Auth
+Session required
+
+#### Request
+- Params: none
+- Query: none
+- Body: none
+
+#### Success Response
+Returns status 401 with:
+{ "loggedIn": false }
+
+#### Notes
+- This endpoint intentionally returns 401 even on success.
 
 ---
 
 ## LeetCode
 
-#### `GET /api/leetcode/me`
-Fetches the authenticated user’s LeetCode submissions using LEETCODE_SESSION_COOKIE from environment variables.
+### GET /api/leetcode/me
 
-Note: This endpoint does NOT use the user’s session.
+Fetches LeetCode data for the currently logged-in user (based on the User record in DB).
 
-Auth: None (requires server env var)
-Request: No params/body
+#### Auth
+Session required
 
-Responses
-- 200 OK
-  - Body (JSON): { "count": 0, "submissions": [] }
-- 400 Bad Request (missing LEETCODE_SESSION_COOKIE)
-- 500 Internal Server Error (LeetCode query failure)
+#### Request
+- Params: none
+- Query: none
+- Body: none
 
+#### Success Response (200)
+Returns a raw LeetCode API user object.
 
-#### `GET /api/leetcode/user/:username`
-Fetches public LeetCode user data for a given username.
+#### Error Responses
+- 500
+  - { "message": "<error.message>" }
 
-Auth: None
-
-Path Parameters
-- username (string)
-
-Responses
-- 200 OK
-  - Body: LeetCode user object (shape depends on leetcode-query)
-- Failure behavior (current): errors may be logged without a structured error response.
-
-
-#### `POST /api/leetcode/link-account`
-Links a LeetCode account by verifying GitHub URL match and updating DB.
-
-Auth: None (current)
-
-Request Body (JSON)
-- username (string)
-- githubUrl (string)
-
-Responses
-- 200 OK
-  - Body (JSON): { "message": "LeetCode account linked successfully" }
-- 400 Bad Request (validation/verification failure)
-- 404 Not Found (user not found)
+#### Notes
+- The implementation checks `req.session.user?.userId`, but the session stores `req.session.userId`.
+- This mismatch is a known bug and may cause this endpoint to fail even when logged in.
 
 ---
 
-## Notes / Known Inconsistencies
+### GET /api/leetcode/user/:username
 
-1. Response formats vary
-    - Some endpoints return JSON.
-    - Some redirect.
-    - Some return plain text errors.
+Fetches public LeetCode profile data for the given username.
 
-2. Error handling is inconsistent
-    - Some endpoints return 500 with JSON.
-    - Some log errors without sending structured responses.
+#### Auth
+None
 
-3. Auth enforcement is inconsistent
-    - Session exists but is not uniformly required.
-    - Some endpoints rely on environment variables instead of user auth.
+#### Request
+Path param:
+- username (required)
 
-4. No rate limiting
-    - No rate limiting middleware is currently applied.
+#### Success Response (200)
+Returns a raw LeetCode API user object.
+
+#### Error Responses
+- 500
+  - { "message": "<error.message>" }
 
 ---
 
-## Appendix: Endpoint Index
+### POST /api/leetcode/link-account
 
-- `GET /api/auth/me`
-- `GET /api/auth/github/start`
-- `GET /api/auth/github/callback`
-- `POST /api/auth/signout`
-- `GET /api/leetcode/me`
-- `GET /api/leetcode/user/:username`
-- `POST /api/leetcode/link-account`
+Links a LeetCode account to the logged-in user by verifying the GitHub URL on the LeetCode profile matches the GitHub URL from OAuth.
+
+#### Auth
+Session required:
+- `req.session.userId`
+
+#### Request
+Body:
+- leetcodeUsername (required)
+
+#### Success Response (200)
+Example:
+{
+  "success": true,
+  "message": "LeetCode account linked successfully",
+  "user": {
+    "id": "<userId>",
+    "leetcodeUsername": "<original case>",
+    "leetcodeUsernameLower": "<lowercase>"
+  }
+}
+
+#### Error Responses
+- 401
+  - { "message": "user not logged in" }
+- 404
+  - { "error": "Session user not found" }
+- 400
+  - { "message": "Leetcode username is required" }
+- 404
+  - { "error": "LeetCode user not found" }
+- 400
+  - { "error": "LeetCode user does not have a GitHub URL in their profile" }
+- 400
+  - { "error": "LeetCode profile GitHub URL is invalid or not a github.com profile." }
+- 500
+  - { "error": "Your GitHub URL from OAuth is invalid (unexpected)." }
+- 400
+  - { "error": "GitHub URL does not match the one in LeetCode profile" }
+- 409
+  - { "message": "That LeetCode username is already linked to another account." }
+- 500
+  - { "message": "Server error" }
+
+#### Notes
+- Updates User fields:
+  - leetcodeUsername
+  - leetcodeUsernameLower
+- Updates session:
+  - `req.session.leetcodeUsername` set to lowercase username
+- Unique constraint exists on `leetcodeUsernameLower`.
+
+---
+
+## Friend (Follow System)
+
+### POST /api/friend/:leetcodeUsername/follow
+
+Creates a follow relationship for the logged-in user.
+
+#### Auth
+Session required:
+- `req.session.userId`
+- Uses `req.session.leetcodeUsername` for self-follow prevention
+
+#### Request
+Path param:
+- leetcodeUsername (required, normalized: trim + lowercase)
+
+Body: none
+
+#### Success Response (200)
+Example:
+{
+  "success": true,
+  "message": "Successfully followed user",
+  "follow": {
+    "_id": "<objectId>",
+    "leetnodeUser": "<userId>",
+    "leetcodeUsername": "<lowercase>",
+    "createdAt": "<ISO date>",
+    "updatedAt": "<ISO date>"
+  }
+}
+
+#### Error Responses
+- 400
+  - { "success": false, "message": "Leetcode username not provided" }
+- 401
+  - { "success": false, "message": "Not logged in" }
+- 400
+  - { "success": false, "message": "Cannot follow yourself" }
+- 400
+  - { "success": false, "message": "Already following user" }
+- 404
+  - { "success": false, "message": "LeetCode user not found" }
+- 503
+  - { "success": false, "message": "LeetCode verification unavailable. Try again." }
+- 409
+  - { "success": false, "message": "Already following user" }
+- 500
+  - { "message": "<error.message>" }
+
+#### Notes
+- Verifies target LeetCode user exists via LeetCode API with a 5s timeout.
+- Duplicate prevention:
+  - pre-check with findOne
+  - unique compound index
+  - 11000 duplicate key mapped to 409
+
+---
+
+### DELETE /api/friend/:leetcodeUsername/follow
+
+Deletes a follow relationship for the logged-in user.
+
+#### Auth
+Session required:
+- `req.session.userId`
+
+#### Request
+Path param:
+- leetcodeUsername (required, normalized: trim + lowercase)
+
+Body: none
+
+#### Success Response (200)
+Example:
+{
+  "success": true,
+  "message": "Successfully unfollowed user",
+  "unfollow": {
+    "_id": "<objectId>",
+    "leetnodeUser": "<userId>",
+    "leetcodeUsername": "<lowercase>",
+    "createdAt": "<ISO date>",
+    "updatedAt": "<ISO date>"
+  }
+}
+
+#### Error Responses
+- 400
+  - { "success": false, "message": "Leetcode username not provided" }
+- 401
+  - { "success": false, "message": "Not logged in" }
+- 400
+  - { "success": false, "message": "Cannot unfollow yourself" }
+- 400
+  - { "success": false, "message": "You are not following this user" }
+- 500
+  - { "message": "<error.message>" }
+
+---
+
+### GET /api/friend/counts
+
+Returns follower and following counts for the logged-in user.
+
+#### Auth
+Session required:
+- `req.session.userId`
+- `req.session.leetcodeUsername`
+
+#### Request
+- Params: none
+- Query: none
+- Body: none
+
+#### Success Response (200)
+Example:
+{
+  "success": true,
+  "counts": {
+    "followerCount": 42,
+    "followingCount": 15
+  }
+}
+
+#### Error Responses
+- 401
+  - { "success": false, "message": "Please log in to view friend counts" }
+- 400
+  - { "success": false, "message": "Please link your leetcode-account to view friend counts" }
+- 500
+  - { "message": "<error.message>" }
+
+#### Notes
+- followerCount: Friend documents where leetcodeUsername equals current user’s leetcodeUsername
+- followingCount: Friend documents where leetnodeUser equals current userId
+
+---
+
+### GET /api/friend/is-following/:leetcodeUsername
+
+Checks whether the logged-in user follows the given LeetCode username.
+
+#### Auth
+Session required:
+- `req.session.userId`
+
+#### Request
+Path param:
+- leetcodeUsername (required)
+
+#### Success Response (200)
+Example:
+{ "isFollowing": true }
+
+#### Error Responses
+- 400
+  - { "success": false, "message": "Please provide a leetcode username" }
+- 401
+  - { "success": false, "message": "Please log in to view isFollowing" }
+- 500
+  - { "message": "<error.message>" }
+
+#### Notes
+- Uses Friend.exists() for efficiency.
+- Username normalized via trim + lowercase.
+
+---
+
+### GET /api/friend/followers
+
+Returns Friend edges representing who follows the logged-in user.
+
+#### Auth
+Session required:
+- `req.session.userId`
+- `req.session.leetcodeUsername`
+
+#### Success Response (200)
+Example:
+{
+  "success": true,
+  "message": "User Followers",
+  "followers": [
+    {
+      "_id": "<objectId>",
+      "leetnodeUser": "<userId>",
+      "leetcodeUsername": "<lowercase>",
+      "createdAt": "<ISO date>",
+      "updatedAt": "<ISO date>"
+    }
+  ]
+}
+
+#### Error Responses
+- 401
+  - { "success": false, "message": "please log in to view folllowers" }
+- 401
+  - { "success": false, "message": "Please link your leetcode account" }
+- 500
+  - { "message": "<error.message>" }
+
+#### Notes
+- Typo in error message: "folllowers"
+- No pagination
+
+---
+
+### GET /api/friend/following
+
+Returns Friend edges representing who the logged-in user is following.
+
+#### Auth
+Session required:
+- `req.session.userId`
+
+#### Success Response (200)
+Example:
+{
+  "success": true,
+  "message": "User Following",
+  "following": [
+    {
+      "_id": "<objectId>",
+      "leetnodeUser": "<userId>",
+      "leetcodeUsername": "<lowercase>",
+      "createdAt": "<ISO date>",
+      "updatedAt": "<ISO date>"
+    }
+  ]
+}
+
+#### Error Responses
+- 401
+  - { "success": false, "message": "Please log in to view following" }
+- 500
+  - { "message": "<error.message>" }
+
+#### Notes
+- No pagination
+
+---
+
+## Inconsistencies
+
+1. Typo in getFollowers error message: "folllowers" (three l’s)
+2. Typo in signin response field: "existingUSer"
+3. Session bug in GET /api/leetcode/me: checks `req.session.user?.userId` but session stores `req.session.userId`
+4. Inconsistent error response shapes:
+   - sometimes { message }
+   - sometimes { error }
+   - sometimes { success, message }
+5. Inconsistent error status codes across endpoints for similar issues
+6. POST /api/auth/signout returns 401 even on success (unconventional but current behavior)
+7. signup/signin endpoints exist but are not integrated with OAuth session login flow
+
+---
+
+## Missing / Not Found
+
+- Pagination query parameters (limit/page/offset) are not implemented
+- Rate limiting is not implemented
+- Joi is present but not used for request validation
+- identification middleware exists but is unused and checks a session field (`accessToken`) that is not set
+- No structured request/response logging middleware
+- No standardized error envelope across the API
