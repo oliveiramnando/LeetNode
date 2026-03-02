@@ -123,8 +123,8 @@ export const githubOAuthCallback = async (req, res) => {
             if (err) return res.status(500).json({ message: "Failed to create session" });
 
             req.session.userId = user?._id;
-            if (user.leetcodeUsername) {
-                req.session.leetcodeUsername = user.leetcodeUsername;
+            if (user.leetcodeUsernameLower) {
+                req.session.leetcodeUsername = user.leetcodeUsernameLower;
             }
 
             if (!user.leetcodeUsername) return res.redirect(`${process.env.FRONTEND_URL}/link-account`);
