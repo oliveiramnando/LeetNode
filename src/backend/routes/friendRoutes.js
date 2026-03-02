@@ -4,8 +4,8 @@ import { follow, unfollow, getFollowers, getFollowing } from "../controllers/fri
 const router = express.Router();
 
 
-router.post('/follow', follow);
-router.delete('/unfollow', unfollow);
+router.post('/:leetcodeUsername/follow', follow);
+router.delete('/:leetcodeUsername/follow', unfollow);
 
 router.get('/followers', getFollowers);
 router.get('/following', getFollowing);
