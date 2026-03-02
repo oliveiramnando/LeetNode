@@ -10,6 +10,7 @@ import { RecentSubmissionsTable } from "@/components/profile/RecentSubmissionsTa
 import { AttemptsInsights } from "@/components/profile/AttemptsInsights";
 import { BadgesSection } from "@/components/profile/BadgesSection";
 import { EmptyState } from "@/components/profile/EmptyState";
+import { ProfileSocialActions } from "@/components/profile/ProfileSocialActions";
 
 async function getProfile(username: string): Promise<LeetNodeUserPayload | null> {
   const origin = process.env.APP_ORIGIN || "http://localhost:3000";
@@ -22,13 +23,12 @@ async function getProfile(username: string): Promise<LeetNodeUserPayload | null>
   return normalizeBackendLeetCodeUser(json);
 }
 
-
 export default async function ProfilePage({
   params,
 }: {
   params: Promise<{ username: string }> | { username: string };
 }) {
-  const resolvedParams = await params; // works whether params is a Promise or not
+  const resolvedParams = await params;
   const username = resolvedParams?.username;
 
   if (!username) {
@@ -59,7 +59,11 @@ export default async function ProfilePage({
   return (
     <div className="mx-auto w-full max-w-6xl px-6 py-10">
       <div className="space-y-6">
-        <ProfileHeader user={matched} />
+        {/* Follow/Unfollow (or Followers/Following pill on your profile) is now inside the hero next to @username */}
+        <ProfileHeader
+          user={matched}
+          heroAction={<ProfileSocialActions profileUsername={username} />}
+        />
 
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
           <SolvedOverviewCard metrics={solvedMetrics} />
