@@ -4,8 +4,15 @@ import type { MatchedUser } from "@/types/leetnode";
 import { Card, CardContent, CardHeader } from "@/components/ui/Card";
 import { Pill } from "@/components/ui/Pill";
 import { Stat } from "@/components/ui/Stat";
+import type React from "react";
 
-export function ProfileHeader({ user }: { user: MatchedUser }) {
+export function ProfileHeader({
+  user,
+  heroAction,
+}: {
+  user: MatchedUser;
+  heroAction?: React.ReactNode;
+}) {
   const p = user.profile;
 
   return (
@@ -27,7 +34,12 @@ export function ProfileHeader({ user }: { user: MatchedUser }) {
           <div>
             <div className="flex flex-wrap items-center gap-2">
               <h1 className="text-lg font-semibold text-white">{p.realName || user.username}</h1>
-              <Pill className="text-[11px]">@{user.username}</Pill>
+
+              {/* Username pill + hero action pill (Follow/Unfollow OR Followers/Following) */}
+              <div className="flex flex-wrap items-center gap-2">
+                <Pill className="text-[11px]">@{user.username}</Pill>
+                {heroAction ? <div className="inline-flex">{heroAction}</div> : null}
+              </div>
             </div>
 
             <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-white/60">
