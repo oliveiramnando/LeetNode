@@ -249,3 +249,65 @@ These are illustrative examples using only schema fields.
   "createdAt": "2026-03-02T10:15:00.000Z",
   "updatedAt": "2026-03-02T10:15:00.000Z"
 }
+```
+### B) After linking LeetCode
+
+```json
+{
+  "_id": "507f1f77bcf86cd799439011",
+  "name": null,
+  "githubID": 12345678,
+  "githubUsername": "octocat",
+  "githubUrl": "https://github.com/octocat",
+  "leetcodeUsername": "LeetCodeUser123",
+  "leetcodeUsernameLower": "leetcodeuser123",
+  "createdAt": "2026-03-02T10:15:00.000Z",
+  "updatedAt": "2026-03-02T10:22:45.000Z"
+}
+```
+
+---
+
+## Known Issues and Inconsistencies
+
+### `/api/leetcode/me` — Session Lookup Bug
+
+In `leetcodeController.me()`, the code is inconsistent with the actual session shape:
+
+- It checks `req.session.user?.userId`, even though the session stores `req.session.userId` (there is **no nested `user` object**).
+- It attempts to query a `userId` field in the `User` collection, which is **not part of the schema** (`User` uses `_id`).
+
+**Expected pattern:**
+
+```js
+User.findById(req.session.userId);
+```
+---
+
+## Practical Invariants
+
+### After Successful GitHub OAuth
+
+The following conditions must hold:
+
+- `githubID` exists on the `User` document.
+- `githubUsername` exists on the `User` document.
+- `githubUrl` exists on the `User` document.
+- `req.session.userId` is defined and references the authenticated user’s `_id`.
+
+---
+
+### After Successful Link Account
+
+The following conditions must hold:
+
+- `leetcodeUsername` exists on the `User` document.
+- `leetcodeUsernameLower` exists on the `User` document.
+- `req.session.leetcodeUsername` is set and equals `leetcodeUsernameLower`.
+
+---
+
+## Database Constraints
+
+- `leetcodeUsernameLower` must be globally unique across all users.
+- This uniqueness is enforced at the MongoDB index level.
