@@ -1,25 +1,16 @@
+// src/frontend/src/components/profile/ProfileSocialActions.tsx
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { Pill } from "@/components/ui/Pill";
-
-type MeResponse =
-  | { loggedIn: false }
-  | {
-      loggedIn: true;
-      user: {
-        id: string;
-        leetcodeUsername?: string | null;
-        leetcodeUsernameLower?: string | null;
-      };
-    };
+import { useAuth } from "@/components/auth/AuthProvider";
 
 type FriendDoc = {
   _id: string;
-  leetnodeUser: string; // ObjectId string
-  leetcodeUsername: string; // stored lowercase in Friend
+  leetnodeUser: string;
+  leetcodeUsername: string; // lowercase in DB
   createdAt?: string;
 };
 
@@ -39,19 +30,16 @@ function Modal({
   children: React.ReactNode;
 }) {
   const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
+  useEffect(() => setMounted(true), []);
   if (!open || !mounted) return null;
 
   return createPortal(
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center" aria-modal="true" role="dialog">
-      {/* overlay */}
+    <div
+      className="fixed inset-0 z-[9999] flex items-center justify-center"
+      aria-modal="true"
+      role="dialog"
+    >
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
-
-      {/* panel */}
       <div className="relative z-10 w-[92vw] max-w-lg rounded-2xl border border-neutral-200 bg-white shadow-xl dark:border-neutral-800 dark:bg-neutral-950">
         <div className="flex items-center justify-between border-b border-neutral-200 px-4 py-3 dark:border-neutral-800">
           <div className="text-sm font-semibold">{title}</div>
@@ -71,65 +59,47 @@ function Modal({
 
 export function ProfileSocialActions({ profileUsername }: { profileUsername: string }) {
   const backend = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8080";
+
+  const { loading: loadingAuth, loggedIn, user } = useAuth();
+
   const target = useMemo(() => normalizeLc(profileUsername), [profileUsername]);
 
-  const [me, setMe] = useState<MeResponse | null>(null);
-  const [loadingMe, setLoadingMe] = useState(true);
-
-  const [isFollowing, setIsFollowing] = useState(false);
-  const [loadingFollowState, setLoadingFollowState] = useState(true);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  // lists (only for your profile)
-  const [followers, setFollowers] = useState<FriendDoc[]>([]);
-  const [following, setFollowing] = useState<FriendDoc[]>([]);
-  const [loadingLists, setLoadingLists] = useState(false);
-
-  // popup
-  const [openModal, setOpenModal] = useState(false);
-  const [tab, setTab] = useState<"followers" | "following">("followers");
-
-  const myLcLower =
-    me && "loggedIn" in me && me.loggedIn
-      ? (me.user.leetcodeUsernameLower ?? normalizeLc(me.user.leetcodeUsername ?? ""))
-      : "";
+  const myLcLower = useMemo(() => {
+    const raw = user?.leetcodeUsernameLower ?? user?.leetcodeUsername ?? "";
+    return normalizeLc(raw);
+  }, [user]);
 
   const isMyProfile = !!myLcLower && myLcLower === target;
 
-  // Load /auth/me
-  useEffect(() => {
-    const run = async () => {
-      setLoadingMe(true);
-      try {
-        const res = await fetch(`${backend}/api/auth/me`, {
-          credentials: "include",
-          cache: "no-store",
-        });
-        if (!res.ok) {
-          setMe({ loggedIn: false });
-          return;
-        }
-        const data = await res.json();
-        setMe(data);
-      } catch {
-        setMe({ loggedIn: false });
-      } finally {
-        setLoadingMe(false);
-      }
-    };
-    run();
-  }, [backend]);
+  // follow state (viewing others)
+  const [isFollowing, setIsFollowing] = useState(false);
+  const [loadingFollowState, setLoadingFollowState] = useState(false);
 
-  // Determine initial follow state (by checking my following list)
+  // counts (my profile)
+  const [counts, setCounts] = useState<{ followerCount: number; followingCount: number } | null>(null);
+  const [loadingCounts, setLoadingCounts] = useState(false);
+
+  // lists (my profile; lazy)
+  const [followers, setFollowers] = useState<FriendDoc[]>([]);
+  const [following, setFollowing] = useState<FriendDoc[]>([]);
+  const [loadedListsOnce, setLoadedListsOnce] = useState(false);
+  const [loadingLists, setLoadingLists] = useState(false);
+
+  // modal
+  const [openModal, setOpenModal] = useState(false);
+  const [tab, setTab] = useState<"followers" | "following">("followers");
+
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // ✅ fetch follow state via boolean endpoint (only for other profiles)
   useEffect(() => {
+    let cancelled = false;
+
     const run = async () => {
-      if (!me || !("loggedIn" in me) || !me.loggedIn) {
-        setIsFollowing(false);
-        setLoadingFollowState(false);
-        return;
-      }
-      if (isMyProfile) {
+      if (loadingAuth) return;
+
+      if (!loggedIn || isMyProfile) {
         setIsFollowing(false);
         setLoadingFollowState(false);
         return;
@@ -137,32 +107,83 @@ export function ProfileSocialActions({ profileUsername }: { profileUsername: str
 
       setLoadingFollowState(true);
       try {
-        const res = await fetch(`${backend}/api/friend/following`, {
-          credentials: "include",
-          cache: "no-store",
-        });
+        const res = await fetch(
+          `${backend}/api/friend/is-following/${encodeURIComponent(target)}`,
+          {
+            credentials: "include",
+            cache: "no-store",
+            headers: { Accept: "application/json" },
+          }
+        );
+
         if (!res.ok) {
-          setIsFollowing(false);
+          if (!cancelled) setIsFollowing(false);
           return;
         }
-        const data = await res.json();
-        const list: FriendDoc[] = Array.isArray(data?.following) ? data.following : [];
-        setIsFollowing(list.some((x) => normalizeLc(x.leetcodeUsername) === target));
+
+        const data = await res.json().catch(() => ({}));
+        if (!cancelled) setIsFollowing(Boolean(data?.isFollowing));
       } catch {
-        setIsFollowing(false);
+        if (!cancelled) setIsFollowing(false);
       } finally {
-        setLoadingFollowState(false);
+        if (!cancelled) setLoadingFollowState(false);
       }
     };
 
     run();
-  }, [backend, me, target, isMyProfile]);
+    return () => {
+      cancelled = true;
+    };
+  }, [backend, loadingAuth, loggedIn, isMyProfile, target]);
 
-  // Load my followers/following lists (only when I'm on my profile)
+  // ✅ fetch counts immediately for my profile (cheap)
   useEffect(() => {
+    let cancelled = false;
+
     const run = async () => {
-      if (!me || !("loggedIn" in me) || !me.loggedIn) return;
+      if (loadingAuth) return;
+      if (!loggedIn) return;
       if (!isMyProfile) return;
+
+      setLoadingCounts(true);
+      try {
+        const res = await fetch(`${backend}/api/friend/counts`, {
+          credentials: "include",
+          cache: "no-store",
+          headers: { Accept: "application/json" },
+        });
+        if (!res.ok) return;
+
+        const data = await res.json().catch(() => null);
+        const c = data?.counts;
+
+        if (!cancelled && c) {
+          setCounts({
+            followerCount: Number(c.followerCount ?? 0),
+            followingCount: Number(c.followingCount ?? 0),
+          });
+        }
+      } catch {
+        // ignore
+      } finally {
+        if (!cancelled) setLoadingCounts(false);
+      }
+    };
+
+    run();
+    return () => {
+      cancelled = true;
+    };
+  }, [backend, loadingAuth, loggedIn, isMyProfile]);
+
+  // ✅ lazy-load lists only when modal opens (my profile)
+  useEffect(() => {
+    let cancelled = false;
+
+    const run = async () => {
+      if (!openModal) return;
+      if (loadingAuth || !loggedIn || !isMyProfile) return;
+      if (loadedListsOnce) return;
 
       setLoadingLists(true);
       try {
@@ -171,26 +192,36 @@ export function ProfileSocialActions({ profileUsername }: { profileUsername: str
           fetch(`${backend}/api/friend/following`, { credentials: "include", cache: "no-store" }),
         ]);
 
-        const followersJson = followersRes.ok ? await followersRes.json() : null;
-        const followingJson = followingRes.ok ? await followingRes.json() : null;
+        const followersJson = followersRes.ok ? await followersRes.json().catch(() => null) : null;
+        const followingJson = followingRes.ok ? await followingRes.json().catch(() => null) : null;
 
-        setFollowers(Array.isArray(followersJson?.followers) ? followersJson.followers : []);
-        setFollowing(Array.isArray(followingJson?.following) ? followingJson.following : []);
+        if (!cancelled) {
+          setFollowers(Array.isArray(followersJson?.followers) ? followersJson.followers : []);
+          setFollowing(Array.isArray(followingJson?.following) ? followingJson.following : []);
+          setLoadedListsOnce(true);
+        }
       } catch {
-        setFollowers([]);
-        setFollowing([]);
+        if (!cancelled) {
+          setFollowers([]);
+          setFollowing([]);
+          setLoadedListsOnce(true);
+        }
       } finally {
-        setLoadingLists(false);
+        if (!cancelled) setLoadingLists(false);
       }
     };
 
     run();
-  }, [backend, me, isMyProfile]);
+    return () => {
+      cancelled = true;
+    };
+  }, [openModal, backend, loadingAuth, loggedIn, isMyProfile, loadedListsOnce]);
 
   async function toggleFollow() {
     setError(null);
 
-    if (!me || !("loggedIn" in me) || !me.loggedIn) {
+    if (loadingAuth) return;
+    if (!loggedIn) {
       setError("Log in to follow users.");
       return;
     }
@@ -207,15 +238,14 @@ export function ProfileSocialActions({ profileUsername }: { profileUsername: str
         credentials: "include",
         headers: { Accept: "application/json" },
       });
-      const data = await res.json().catch(() => null);
 
+      const data = await res.json().catch(() => null);
       if (!res.ok) {
         setError(data?.message || data?.error || "Request failed");
         return;
       }
 
-      // flip only AFTER success
-      setIsFollowing(!isFollowing);
+      setIsFollowing((prev) => !prev);
     } catch {
       setError("Request failed (network).");
     } finally {
@@ -223,32 +253,20 @@ export function ProfileSocialActions({ profileUsername }: { profileUsername: str
     }
   }
 
-  const loggedIn = !!me && "loggedIn" in me && me.loggedIn;
-
-  // Loading state: show a pill-looking placeholder that matches @username pill
-  if (loadingMe) {
-    return (
-      <Pill className="text-[11px]">
-        ...
-      </Pill>
-    );
-  }
-
-  // Not logged in: keep hero clean
+  // Loading auth: placeholder pill
+  if (loadingAuth) return <Pill className="text-[11px]">...</Pill>;
   if (!loggedIn) return null;
 
-  // MY profile: show counts pill (click opens popup)
+  // My profile
   if (isMyProfile) {
-    const followersCount = followers.length;
-    const followingCount = following.length;
+    const followersCount = counts?.followerCount ?? 0;
+    const followingCount = counts?.followingCount ?? 0;
 
     return (
       <>
         <button
           type="button"
-          disabled={loadingLists}
           onClick={() => {
-            if (loadingLists) return;
             setTab("followers");
             setOpenModal(true);
           }}
@@ -256,12 +274,11 @@ export function ProfileSocialActions({ profileUsername }: { profileUsername: str
           aria-label="View followers and following"
         >
           <Pill className="text-[11px]">
-            {loadingLists ? "Loading..." : `${followersCount} Followers • ${followingCount} Following`}
+            {loadingCounts ? "Loading..." : `${followersCount} Followers • ${followingCount} Following`}
           </Pill>
         </button>
 
         <Modal open={openModal} onClose={() => setOpenModal(false)} title="Followers & Following">
-          {/* tabs */}
           <div className="flex gap-2 px-4 pt-3">
             <button
               onClick={() => setTab("followers")}
@@ -273,6 +290,7 @@ export function ProfileSocialActions({ profileUsername }: { profileUsername: str
             >
               Followers ({followers.length})
             </button>
+
             <button
               onClick={() => setTab("following")}
               className={`rounded-full px-3 py-1 text-sm font-medium ${
@@ -285,21 +303,22 @@ export function ProfileSocialActions({ profileUsername }: { profileUsername: str
             </button>
           </div>
 
-          {/* scrollable list */}
           <div className="px-4 pb-4 pt-3">
             <div className="max-h-[55vh] overflow-auto rounded-xl border border-neutral-200 p-2 text-sm dark:border-neutral-800">
-              {tab === "following" ? (
+              {loadingLists && !loadedListsOnce ? (
+                <div className="p-3 text-neutral-500">Loading…</div>
+              ) : tab === "following" ? (
                 following.length ? (
                   <ul className="divide-y divide-neutral-200 dark:divide-neutral-800">
                     {following.map((f) => (
                       <li key={f._id} className="py-2 px-2">
                         <Link
-													href={`/profile/${encodeURIComponent(f.leetcodeUsername)}`}
-													onClick={() => setOpenModal(false)}
-													className="block rounded-lg px-2 py-1 hover:bg-neutral-100 dark:hover:bg-neutral-900"
-												>
-													{f.leetcodeUsername}
-												</Link>
+                          href={`/profile/${encodeURIComponent(f.leetcodeUsername)}`}
+                          onClick={() => setOpenModal(false)}
+                          className="block rounded-lg px-2 py-1 hover:bg-neutral-100 dark:hover:bg-neutral-900"
+                        >
+                          {f.leetcodeUsername}
+                        </Link>
                       </li>
                     ))}
                   </ul>
@@ -310,14 +329,13 @@ export function ProfileSocialActions({ profileUsername }: { profileUsername: str
                 <ul className="divide-y divide-neutral-200 dark:divide-neutral-800">
                   {followers.map((f) => (
                     <li key={f._id} className="py-2 px-2">
-                      {/* backend returns leetnodeUser ObjectId; if you want usernames, populate on backend */}
                       <Link
-												href={`/profile/${encodeURIComponent(f.leetcodeUsername)}`}
-												onClick={() => setOpenModal(false)}
-												className="block rounded-lg px-2 py-1 hover:bg-neutral-100 dark:hover:bg-neutral-900"
-											>
-												{f.leetcodeUsername}
-											</Link>
+                        href={`/profile/${encodeURIComponent(f.leetcodeUsername)}`}
+                        onClick={() => setOpenModal(false)}
+                        className="block rounded-lg px-2 py-1 hover:bg-neutral-100 dark:hover:bg-neutral-900"
+                      >
+                        {f.leetcodeUsername}
+                      </Link>
                     </li>
                   ))}
                 </ul>
@@ -325,18 +343,13 @@ export function ProfileSocialActions({ profileUsername }: { profileUsername: str
                 <div className="p-3 text-neutral-500">No followers yet.</div>
               )}
             </div>
-
-            <div className="mt-2 text-xs text-neutral-500">
-              Tip: If you want follower usernames instead of IDs, update the backend to populate{" "}
-              <span className="mx-1 font-mono">leetnodeUser</span>.
-            </div>
           </div>
         </Modal>
       </>
     );
   }
 
-  // OTHER profiles: follow/unfollow pill
+  // Other profiles
   const label = loadingFollowState ? "..." : isFollowing ? "Unfollow" : "Follow";
 
   return (
@@ -346,13 +359,9 @@ export function ProfileSocialActions({ profileUsername }: { profileUsername: str
         onClick={toggleFollow}
         disabled={busy || loadingFollowState}
         className="disabled:cursor-not-allowed disabled:opacity-60"
-        aria-label={isFollowing ? "Unfollow user" : "Follow user"}
       >
-        <Pill className="text-[11px]">
-          {busy ? "Working..." : label}
-        </Pill>
+        <Pill className="text-[11px]">{busy ? "Working..." : label}</Pill>
       </button>
-
       {error ? <div className="text-xs text-red-600">{error}</div> : null}
     </div>
   );

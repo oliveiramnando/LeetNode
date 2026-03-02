@@ -1,3 +1,4 @@
+// components/FriendSearch.jsx
 "use client";
 
 import { useEffect, useState } from "react";
