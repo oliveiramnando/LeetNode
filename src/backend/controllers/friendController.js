@@ -102,6 +102,55 @@ export const unfollow = async (req,res) => {
     }
 }
 
+export const getFriendCounts = async (req, res) => {
+    try {
+        const currentUserId = req.session?.userId;
+        const currentLeetcodeUsername = req.session?.leetcodeUsername;
+
+        if (!currentUserId) return res.status(401).json({ success: false, message: "Please log in to view friend counts" });
+        if (!currentLeetcodeUsername) return res.status(400).json({ success: false, message: "Please link your leetcode-account to view friend counts" });
+    
+
+        const lc = String(currentLeetcodeUsername).trim().toLowerCase();
+
+        const [followerCount, followingCount] = await Promise.all([
+            Friend.countDocuments({ leetcodeUsername: lc }), // followers
+            Friend.countDocuments({ leetnodeUser: currentUserId }) // following
+        ]);
+
+        return res.status(200).json({
+            success: true,
+            counts: { followerCount, followingCount },
+        });
+    } catch (error) {
+        console.log(error);
+        return res.status(500).json({
+            message: error.message
+        });
+    }
+};
+
+export const isFollowing = async (req,res) => {
+    try {
+        const { leetcodeUsername } = req.params;
+        const currentUserId = req.session?.userId;
+
+        if (!leetcodeUsername) return res.status(400).json({ success: false, message: "Please provide a leetcode username" });
+        if (!currentUserId) return res.status(401).json({ success: false, message: "Please log in to view isFollowing" });
+
+        const target = String(leetcodeUsername).trim().toLowerCase();
+        const exists = await Friend.exists({ leetnodeUser: currentUserId, leetcodeUsername: target });
+
+        return res.json({ isFollowing: !!exists });
+        
+    } catch (error) {
+        console.log(error);
+        return res.status(500).json({
+            message: error.message
+        });
+    }
+}
+
 export const getFollowers = async (req,res) => {
     try {
         const currentUserId = req.session?.userId;
