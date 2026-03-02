@@ -18,10 +18,9 @@ const FriendSchema = new mongoose.Schema({
     timestamps: true
 });
 
-FriendSchema.index(
-    { leetnodeUser: 1, leetcodeUsername: 1 },
-    { unique: true }
-);
+FriendSchema.index({ leetnodeUser: 1 });
+FriendSchema.index({ leetcodeUsername: 1 });
+FriendSchema.index({ leetnodeUser: 1, leetcodeUsername: 1 }, { unique: true });
 
 const Friend = mongoose.model('Friend', FriendSchema);
 export default Friend;
