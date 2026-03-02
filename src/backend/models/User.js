@@ -1,39 +1,36 @@
 import mongoose from "mongoose";
 
 const UserSchema = new mongoose.Schema({
-    name : {
-        type: String
-    },
-    githubID:{
+    name: String,
+    githubID: {
         type: Number,
-        // required: true,
-        trim: true,
-        // unique: true,
         index: true
     },
     githubUsername: {
         type: String,
-        // required: true,
         trim: true,
         unique: true,
         index: true
     },
     githubUrl: {
         type: String,
-        // required: true,
         trim: true,
-        // unique: true,
         index: true
     },
     leetcodeUsername: {
-        type: String,
-        unique: true,
-        sparse: true, // allows multiple docs with null/undefined leetcodeUsername
+        type: String, 
+        trim: true
+    },
+    leetcodeUsernameLower: {
+        type: String, 
         trim: true,
+        sparse: true
     }
-}, {
-    timestamps: true
-});
+}, { timestamps: true });
 
-const User = mongoose.model('User', UserSchema);
-export default User;
+UserSchema.index(
+    { leetcodeUsernameLower: 1 },
+    { unique: true, sparse: true }
+);
+
+export default mongoose.models.User || mongoose.model('User', UserSchema);
