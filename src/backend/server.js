@@ -7,7 +7,8 @@ import connectDB from "./config/db.js";
 
 import authRoutes from "./routes/authRoutes.js";
 import leetcodeRoutes from "./routes/leetcodeRoute.js";
-import friendroutes from "./routes/friendRoutes.js";
+import friendRoutes from "./routes/friendRoutes.js";
+import submissionRoutes from "./routes/submissionRoutes.js";
 
 const PORT = process.env.PORT || 8080;
 const app = express();
@@ -21,7 +22,8 @@ app.get("/api/health", (_, res) => res.json({ ok: true }));
 
 app.use("/api/auth", authRoutes);
 app.use("/api/leetcode", leetcodeRoutes);
-app.use("/api/friend", friendroutes);
+app.use("/api/friend", friendRoutes);
+app.use("/api/submissions", submissionRoutes)
 
 connectDB().then(() => {
 	app.listen(PORT, () => console.log("Server started on PORT:", PORT));
