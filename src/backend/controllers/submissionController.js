@@ -2,6 +2,44 @@ import { LeetCode } from "leetcode-query";
 import lc_problems from "../models/submissions/lc_problems.js";
 import lc_submission_events from "../models/submissions/lc_submission_events.js";
 
+export const langDistribution = async (req,res) => {
+    try {
+        const userId = req.session?.userId;
+        const leetcodeUsername = req.session?.leetcodeUsername;
+
+        if (!userId) return res.status(401).json({ success:false, message: "Please log in" });
+        if (!leetcodeUsername) return res.status(400).json({ success: false, message: "Link your leetcode account" });
+
+        const langMap = Object.create(null);
+        const acceptedLangMap = Object.create(null);
+
+        const allSubmissions = await lc_submission_events.find({ userId }, 
+            { titleSlug: 1, lang: 1, status: 1}
+        ).lean();
+
+        console.log(allSubmissions);
+
+        for (const submission of allSubmissions) {
+            langMap[submission.lang] = (langMap[submission.lang] || 0) + 1;
+            if (submission.status === "Accepted") {
+                acceptedLangMap[submission.lang] = (acceptedLangMap[submission.lang] || 0) + 1;
+            }
+        }
+
+        return res.status(200).json({
+            success: true,
+            langMap,
+            acceptedLangMap
+        });
+
+    } catch (error) {
+        console.log(error);
+        return res.status(500).json({
+            message: error.message
+        })
+    }
+}
+
 export const tagStrengths = async (req, res) => {
     try {
         const userId = req.session?.userId;
@@ -61,7 +99,7 @@ export const tagStrengths = async (req, res) => {
             const tagsArr = Array.isArray(p.topicTags) ? p.topicTags : [];
             for (const t of tagsArr) {
                 const name =
-                typeof t === "string" ? t : t?.name ?? t?.title ?? t?.slug;
+                    typeof t === "string" ? t : t?.name ?? t?.title ?? t?.slug;
 
                 if (!name) continue;
                 tagMap[name] = (tagMap[name] || 0) + 1;
