@@ -1,24 +1,24 @@
 // src/frontend/src/app/profile/[username]/page.tsx
+
 import type { LeetNodeUserPayload } from "@/types/leetnode";
 import { normalizeBackendLeetCodeUser } from "@/lib/normalize";
 import { deriveSolvedOverview, deriveYearHeatmap } from "@/lib/derive";
 
 import { ProfileHeader } from "@/components/profile/ProfileHeader";
-import { SolvedOverviewCard } from "@/components/profile/SolvedOverviewCard";
-import { SubmissionHeatmap } from "@/components/profile/SubmissionHeatmap";
-import { RecentSubmissionsTable } from "@/components/profile/RecentSubmissionsTable";
-import { AttemptsInsights } from "@/components/profile/AttemptsInsights";
-import { BadgesSection } from "@/components/profile/BadgesSection";
+import { ProfileSections } from "@/components/profile/ProfileSections";
 import { EmptyState } from "@/components/profile/EmptyState";
 import { ProfileSocialActions } from "@/components/profile/ProfileSocialActions";
 
 async function getProfile(username: string): Promise<LeetNodeUserPayload | null> {
   const origin = process.env.APP_ORIGIN || "http://localhost:3000";
+
   const res = await fetch(
     `${origin}/api/leetcode/user/${encodeURIComponent(username)}`,
     { cache: "no-store" }
   );
+
   if (!res.ok) return null;
+
   const json = await res.json();
   return normalizeBackendLeetCodeUser(json);
 }
@@ -34,7 +34,10 @@ export default async function ProfilePage({
   if (!username) {
     return (
       <div className="mx-auto w-full max-w-6xl px-6 py-10">
-        <EmptyState title="Missing username" description="No username was provided in the route." />
+        <EmptyState
+          title="Missing username"
+          description="No username was provided in the route."
+        />
       </div>
     );
   }
@@ -53,30 +56,35 @@ export default async function ProfilePage({
   }
 
   const matched = payload.user.matchedUser;
-  const solvedMetrics = deriveSolvedOverview(payload.user.allQuestionsCount, matched.submitStats);
-  const heatmap = deriveYearHeatmap(matched.submissionCalendar, new Date(), 52);
+
+  const solvedMetrics = deriveSolvedOverview(
+    payload.user.allQuestionsCount,
+    matched.submitStats
+  );
+
+  const heatmap = deriveYearHeatmap(
+    matched.submissionCalendar,
+    new Date(),
+    52
+  );
 
   return (
     <div className="mx-auto w-full max-w-6xl px-6 py-10">
       <div className="space-y-6">
-        {/* Follow/Unfollow (or Followers/Following pill on your profile) is now inside the hero next to @username */}
+        {/* Profile header stays static */}
         <ProfileHeader
           user={matched}
           heroAction={<ProfileSocialActions profileUsername={username} />}
         />
 
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-          <SolvedOverviewCard metrics={solvedMetrics} />
-          <BadgesSection
-            badges={matched.badges}
-            upcomingBadges={matched.upcomingBadges}
-            activeBadgeId={matched.activeBadge?.id ?? null}
-          />
-        </div>
-
-        <SubmissionHeatmap grid={heatmap} />
-        <AttemptsInsights recent={payload.user.recentSubmissionList} />
-        <RecentSubmissionsTable submissions={payload.user.recentSubmissionList} />
+        {/* Tabbed container (Stats / Submissions Analysis) */}
+        <ProfileSections
+          profileUsername={username}
+          solvedMetrics={solvedMetrics}
+          heatmap={heatmap}
+          matched={matched}
+          recentSubmissionList={payload.user.recentSubmissionList}
+        />
       </div>
     </div>
   );
