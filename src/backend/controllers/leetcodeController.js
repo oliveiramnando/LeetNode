@@ -48,7 +48,7 @@ export const getUser = async (req,res) => {
 
 export const me = async (req, res) => {
     try {
-        const leetnodeUser = await User.findOne({ userId: req.session.user?.userId })
+        const leetnodeUser = await User.findOne({ userId: req.session?.userId })
         console.log(leetnodeUser);
 
         const username = leetnodeUser.leetcodeUsername;
