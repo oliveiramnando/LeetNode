@@ -1,3 +1,4 @@
+// src/frontend/src/components/auth/AuthProvider.tsx
 "use client";
 
 import React from "react";
