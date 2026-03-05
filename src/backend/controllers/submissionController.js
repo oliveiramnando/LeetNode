@@ -40,6 +40,55 @@ export const langDistribution = async (req,res) => {
     }
 }
 
+export const difficultyPerformance = async (req,res) => {
+    try {
+        const userId = req.session?.userId;
+        const leetcodeUsername = req.session?.leetcodeUsername;
+
+        if (!userId) return res.status(401).json({ success:false, message: "Please log in" });
+        if (!leetcodeUsername) return res.status(400).json({ success: false, message: "Link your leetcode account" });
+
+        const easy = [0,0]; // [accepted, total]
+        const medium = [0,0];
+        const hard = [0,0];
+
+        const userSubmissions = await lc_submission_events.find({ userId },
+            { titleSlug: 1, difficulty: 1, status: 1 }
+        );
+
+        for (const submission of userSubmissions) {
+            const problem = await lc_problems.findOne({ titleSlug: submission.titleSlug })
+            if (problem.difficulty === "Medium") {
+                if (submission.status == "Accepted") medium[0] += 1
+                medium[1] += 1
+                continue;
+            }
+            if (problem.difficulty === "Easy") {
+                if (submission.status == "Accepted") easy[0] += 1
+                easy[1] += 1
+                continue;
+            }
+            if (submission.status == "Accepted") hard[0] += 1
+            hard[1] += 1
+            continue;
+        }
+
+        return res.status(200).json({ 
+            success: true,
+            easy,
+            medium,
+            hard
+        })
+
+    } catch (error) {
+        console.log(error);
+        return res.status(500).json({
+            success: false,
+            message: error.message
+        })
+    }
+}
+
 export const tagStrengths = async (req, res) => {
     try {
         const userId = req.session?.userId;
