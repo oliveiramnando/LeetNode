@@ -11,6 +11,10 @@ import {
   PolarRadiusAxis,
   Radar,
   Tooltip,
+  PieChart,
+  Pie,
+  Cell,
+  Legend,
 } from "recharts";
 
 function normalizeLc(username: any) {
@@ -29,6 +33,23 @@ type TagStrengthsResponse =
         tagCount?: number;
         lastUpdated?: string;
       };
+    };
+
+type LangDistributionResponse =
+  | { success: false; message?: string }
+  | {
+      success: true;
+      langMap?: Record<string, number>;
+      acceptedLangMap?: Record<string, number>;
+    };
+
+type DifficultyPerformanceResponse =
+  | { success: false; message?: string }
+  | {
+      success: true;
+      easy?: [number, number];
+      medium?: [number, number];
+      hard?: [number, number];
     };
 
 const TOPICS = [
@@ -123,6 +144,79 @@ function buildTopicDistribution(tagMap: Record<string, number>) {
   return TOPICS.map((topic) => ({ topic, count: base[topic] }));
 }
 
+function recordToPieData(map: Record<string, number>) {
+  return Object.entries(map || {})
+    .filter(([, v]) => typeof v === "number" && v > 0)
+    .map(([name, value]) => ({ name, value }));
+}
+
+function pct(accepted: number, total: number) {
+  if (!total || total <= 0) return 0;
+  return Math.round((accepted / total) * 100);
+}
+
+function DifficultyPercentPie({
+  label,
+  accepted,
+  total,
+  color,
+}: {
+  label: string;
+  accepted: number;
+  total: number;
+  color: string;
+}) {
+  const p = pct(accepted, total);
+
+  const data = [
+    { name: "Progress", value: p },
+    { name: "Remaining", value: Math.max(0, 100 - p) },
+  ];
+
+  return (
+    <div className="flex h-full flex-col rounded-2xl border border-zinc-700/40 bg-[#242424] p-5">
+      <div className="mb-3">
+        <div className="text-lg font-semibold">{label}</div>
+        <div className="mt-1 text-sm text-zinc-300">
+          {accepted}/{total} accepted
+        </div>
+      </div>
+
+      <div className="flex-1">
+        <ResponsiveContainer width="100%" height="100%">
+          <PieChart>
+            <Pie
+              data={data}
+              dataKey="value"
+              startAngle={90}
+              endAngle={-270}
+              innerRadius="78%"
+              outerRadius="92%"
+              paddingAngle={0}
+              isAnimationActive={false}
+              cornerRadius={999}
+            >
+              <Cell fill={color} />
+              <Cell fill="rgba(255,255,255,0.22)" />
+            </Pie>
+
+            <text
+              x="50%"
+              y="50%"
+              textAnchor="middle"
+              dominantBaseline="middle"
+              fill="#ffffff"
+              style={{ fontSize: 28, fontWeight: 700 }}
+            >
+              {p}%
+            </text>
+          </PieChart>
+        </ResponsiveContainer>
+      </div>
+    </div>
+  );
+}
+
 export function SubmissionsAnalysisPanel({
   profileUsername,
 }: {
@@ -130,6 +224,12 @@ export function SubmissionsAnalysisPanel({
 }) {
   const { loading, loggedIn, user } = useAuth();
   const [data, setData] = React.useState<TagStrengthsResponse | null>(null);
+  const [langData, setLangData] = React.useState<LangDistributionResponse | null>(
+    null
+  );
+  const [diffData, setDiffData] =
+    React.useState<DifficultyPerformanceResponse | null>(null);
+
   const [loadingData, setLoadingData] = React.useState(false);
 
   const isOwner = React.useMemo(() => {
@@ -153,21 +253,48 @@ export function SubmissionsAnalysisPanel({
         const backend =
           process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8080";
 
-        const res = await fetch(`${backend}/api/submissions/strengths`, {
-          method: "GET",
-          credentials: "include",
-          headers: { Accept: "application/json" },
-          cache: "no-store",
-        });
+        const [strengthsRes, langRes, diffRes] = await Promise.all([
+          fetch(`${backend}/api/submissions/strengths`, {
+            method: "GET",
+            credentials: "include",
+            headers: { Accept: "application/json" },
+            cache: "no-store",
+          }),
+          fetch(`${backend}/api/submissions/lang-distribution`, {
+            method: "GET",
+            credentials: "include",
+            headers: { Accept: "application/json" },
+            cache: "no-store",
+          }),
+          fetch(`${backend}/api/submissions/difficulty-performance`, {
+            method: "GET",
+            credentials: "include",
+            headers: { Accept: "application/json" },
+            cache: "no-store",
+          }),
+        ]);
 
-        const json = (await res.json()) as TagStrengthsResponse;
+        const strengthsJson = (await strengthsRes.json()) as TagStrengthsResponse;
+        const langJson = (await langRes.json()) as LangDistributionResponse;
+        const diffJson = (await diffRes.json()) as DifficultyPerformanceResponse;
+
         if (!alive) return;
-        setData(json);
+        setData(strengthsJson);
+        setLangData(langJson);
+        setDiffData(diffJson);
       } catch (e: any) {
         if (!alive) return;
         setData({
           success: false,
           message: e?.message ?? "Failed to load tag strengths.",
+        });
+        setLangData({
+          success: false,
+          message: e?.message ?? "Failed to load language distribution.",
+        });
+        setDiffData({
+          success: false,
+          message: e?.message ?? "Failed to load difficulty performance.",
         });
       } finally {
         if (!alive) return;
@@ -210,6 +337,40 @@ export function SubmissionsAnalysisPanel({
   const maxBars = Math.max(1, ...tags.map((t) => t.acceptedCount));
   const topicData = buildTopicDistribution(tagMap);
   const topicMax = Math.max(1, ...topicData.map((d) => d.count));
+
+  const langMap =
+    langData && "success" in langData && langData.success === true
+      ? (langData.langMap ?? {})
+      : {};
+  const acceptedLangMap =
+    langData && "success" in langData && langData.success === true
+      ? (langData.acceptedLangMap ?? {})
+      : {};
+
+  const langPie = recordToPieData(langMap);
+  const acceptedLangPie = recordToPieData(acceptedLangMap);
+  const overallLangPie = recordToPieData(
+    Object.fromEntries(
+      Object.entries(langMap).map(([k, v]) => [
+        k,
+        (v || 0) + (acceptedLangMap[k] || 0),
+      ])
+    )
+  );
+
+  const easy =
+    diffData && "success" in diffData && diffData.success ? diffData.easy : undefined;
+  const medium =
+    diffData && "success" in diffData && diffData.success ? diffData.medium : undefined;
+  const hard =
+    diffData && "success" in diffData && diffData.success ? diffData.hard : undefined;
+
+  const easyA = easy?.[0] ?? 0;
+  const easyT = easy?.[1] ?? 0;
+  const medA = medium?.[0] ?? 0;
+  const medT = medium?.[1] ?? 0;
+  const hardA = hard?.[0] ?? 0;
+  const hardT = hard?.[1] ?? 0;
 
   return (
     <div className="space-y-4">
@@ -259,7 +420,6 @@ export function SubmissionsAnalysisPanel({
           )}
 
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 lg:items-stretch">
-
             {/* Top Tags */}
             <div className="flex h-[420px] flex-col rounded-2xl border border-zinc-700/40 bg-[#242424] p-5">
               <div className="mb-3">
@@ -337,7 +497,122 @@ export function SubmissionsAnalysisPanel({
                 </ResponsiveContainer>
               </div>
             </div>
+          </div>
 
+          {/* Layout: difficulty on left (with overall under), languages stacked on right */}
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-12 lg:items-stretch">
+            {/* Left: Difficulty (3 rings) + Overall under */}
+            <div className="lg:col-span-8 space-y-4">
+              <div className="grid grid-cols-1 gap-4 lg:grid-cols-3 lg:items-stretch">
+                <div className="h-[320px]">
+                  <DifficultyPercentPie
+                    label="Easy"
+                    accepted={easyA}
+                    total={easyT}
+                    color="#22c55e"
+                  />
+                </div>
+                <div className="h-[320px]">
+                  <DifficultyPercentPie
+                    label="Medium"
+                    accepted={medA}
+                    total={medT}
+                    color="#eab308"
+                  />
+                </div>
+                <div className="h-[320px]">
+                  <DifficultyPercentPie
+                    label="Hard"
+                    accepted={hardA}
+                    total={hardT}
+                    color="#ef4444"
+                  />
+                </div>
+              </div>
+
+              {/* Overall Difficulty Performance */}
+              <div className="h-[320px]">
+                <DifficultyPercentPie
+                  label="Overall Difficulty Performance"
+                  accepted={easyA + medA + hardA}
+                  total={easyT + medT + hardT}
+                  color="#f97316"
+                />
+              </div>
+            </div>
+
+            {/* Right: Languages stacked */}
+            <div className="lg:col-span-4 space-y-4">
+              <div className="flex h-[320px] flex-col rounded-2xl border border-zinc-700/40 bg-[#242424] p-5">
+                <div className="mb-2">
+                  <div className="text-base font-semibold">Languages</div>
+                  <div className="mt-1 text-xs text-zinc-300">All submissions.</div>
+                </div>
+                <div className="flex-1">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Tooltip
+                        formatter={(value: any, name: any) => [value, String(name)]}
+                      />
+                      <Legend />
+                      <Pie
+                        data={langPie}
+                        dataKey="value"
+                        nameKey="name"
+                        innerRadius="60%"
+                        outerRadius="85%"
+                        paddingAngle={2}
+                      >
+                        {langPie.map((_, idx) => (
+                          <Cell
+                            key={idx}
+                            fill={
+                              idx % 2 === 0 ? "#f97316" : "rgba(255,255,255,0.22)"
+                            }
+                          />
+                        ))}
+                      </Pie>
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+
+              <div className="flex h-[320px] flex-col rounded-2xl border border-zinc-700/40 bg-[#242424] p-5">
+                <div className="mb-2">
+                  <div className="text-base font-semibold">
+                    Languages (Accepted)
+                  </div>
+                  <div className="mt-1 text-xs text-zinc-300">Accepted only.</div>
+                </div>
+                <div className="flex-1">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Tooltip
+                        formatter={(value: any, name: any) => [value, String(name)]}
+                      />
+                      <Legend />
+                      <Pie
+                        data={acceptedLangPie}
+                        dataKey="value"
+                        nameKey="name"
+                        innerRadius="60%"
+                        outerRadius="85%"
+                        paddingAngle={2}
+                      >
+                        {acceptedLangPie.map((_, idx) => (
+                          <Cell
+                            key={idx}
+                            fill={
+                              idx % 2 === 0 ? "#f97316" : "rgba(255,255,255,0.22)"
+                            }
+                          />
+                        ))}
+                      </Pie>
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            </div>
           </div>
         </>
       )}
