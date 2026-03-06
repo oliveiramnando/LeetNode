@@ -13,6 +13,8 @@ import submissionRoutes from "./routes/submissionRoutes.js";
 const PORT = process.env.PORT || 8080;
 const app = express();
 
+console.log("1. imports finished");
+
 app.use(express.json());
 
 app.use(corsMiddleware);
@@ -23,8 +25,14 @@ app.get("/api/health", (_, res) => res.json({ ok: true }));
 app.use("/api/auth", authRoutes);
 app.use("/api/leetcode", leetcodeRoutes);
 app.use("/api/friend", friendRoutes);
-app.use("/api/submissions", submissionRoutes)
+app.use("/api/submissions", submissionRoutes);
+
+console.log("2. middleware and routes registered");
+console.log("3. about to call connectDB()");
 
 connectDB().then(() => {
+	console.log("4. DB connected");
 	app.listen(PORT, () => console.log("Server started on PORT:", PORT));
+}).catch((err) => {
+	console.error("DB connect failed:", err);
 });
