@@ -1,6 +1,7 @@
 import { LeetCode } from "leetcode-query";
 import lc_problems from "../models/submissions/lc_problems.js";
 import lc_submission_events from "../models/submissions/lc_submission_events.js";
+import mongoose from "mongoose";
 
 export const langDistribution = async (req,res) => {
     try {
@@ -47,28 +48,39 @@ export const difficultyPerformance = async (req,res) => {
 
         if (!userId) return res.status(401).json({ success:false, message: "Please log in" });
         if (!leetcodeUsername) return res.status(400).json({ success: false, message: "Link your leetcode account" });
-
+        
         const easy = [0,0]; // [accepted, total]
         const medium = [0,0];
         const hard = [0,0];
 
         const userSubmissions = await lc_submission_events.find({ userId },
-            { titleSlug: 1, difficulty: 1, status: 1 }
+            { titleSlug: 1, status: 1 }
         );
 
+        const slugs = [...new Set(userSubmissions.map(s => s.titleSlug).filter(Boolean))];
+        const problems = await lc_problems.find(
+            { titleSlug:{ $in: slugs } }, 
+            { titleSlug: 1, difficulty: 1 }
+        ).lean();
+
+        const diffBySlug = Object.create(null);
+        for (const p of problems) diffBySlug[p.titleSlug] = p.difficulty;
+
         for (const submission of userSubmissions) {
-            const problem = await lc_problems.findOne({ titleSlug: submission.titleSlug })
-            if (problem.difficulty === "Medium") {
-                if (submission.status == "Accepted") medium[0] += 1
+            const difficulty = diffBySlug[submission.titleSlug] || "Unknown";
+            const accepted = submission.status === "Accepted"
+
+            if (difficulty === "Medium") {
+                if (accepted) medium[0] += 1
                 medium[1] += 1
                 continue;
             }
-            if (problem.difficulty === "Easy") {
-                if (submission.status == "Accepted") easy[0] += 1
+            if (difficulty === "Easy") {
+                if (accepted) easy[0] += 1
                 easy[1] += 1
                 continue;
             }
-            if (submission.status == "Accepted") hard[0] += 1
+            if (accepted) hard[0] += 1
             hard[1] += 1
             continue;
         }
