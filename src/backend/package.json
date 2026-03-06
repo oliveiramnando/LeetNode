@@ -1,6 +1,6 @@
 {
   "scripts": {
-    "dev": "nodemon --legacy-watch --watch . --ignore node_modules --ext js,json ./server.js"
+    "dev": "node --watch server.js"
   },
   "dependencies": {
     "axios": "^1.13.5",
