@@ -1,8 +1,9 @@
 import express from "express";
-import { langDistribution, difficultyPerformance, tagStrengths } from "../controllers/submissionController.js";
+import { syncSubmissions, langDistribution, difficultyPerformance, tagStrengths } from "../controllers/submissionController.js";
 
 const router = express.Router();
 
+router.get('sync-submissions', syncSubmissions);
 router.get('/lang-distribution', langDistribution);
 router.get('/difficulty-performance', difficultyPerformance)
 router.get('/strengths', tagStrengths);
