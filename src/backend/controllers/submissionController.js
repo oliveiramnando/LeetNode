@@ -3,6 +3,62 @@ import lc_problems from "../models/submissions/lc_problems.js";
 import lc_submission_events from "../models/submissions/lc_submission_events.js";
 import mongoose from "mongoose";
 
+export const syncSubmissions = async (req,res) => {
+    try {
+        const userId = req.sesson?.userId;
+        const leetcodeUsername = req.session?.leetcodeUsername;
+
+        if (!userId) return res.status(401).json({ success: false, message: "Please Log In"});
+        if (!leetcodeUsername) return res.status(401).json({ success: false, message: "Please Link your account"});
+
+        const leetcode = new LeetCode();
+        const recentSubmissions = await leetcode.recent_submissions(leetcodeUsername);
+
+        for (const submission of recentSubmissions) {
+            const { difficulty, topicTags } = await leetcode.problem(submission.titleSlug);
+
+            await lc_problems.findOneAndUpdate(
+                { titleSlug: submission.titleSlug },
+                {
+                    titleSlug: submission.titleSlug,
+                    title: submission.title,
+                    difficulty,
+                    topicTags,
+                },{ 
+                    upsert: true, 
+                    new: true 
+                }
+            );
+
+            const ts = Number(submission.timestamp);
+
+            await lc_submission_events.findOneAndUpdate(
+                { userId, titleSlug: submission.titleSlug, timeStamp: ts },
+                {
+                userId,
+                    titleSlug: submission.titleSlug,
+                    title: submission.title,
+                    timeStamp: ts,
+                    status: submission.statusDisplay,
+                    lang: submission.lang,
+                },
+                { upsert: true, new: true }
+            );
+        }
+
+        return res.status(200).json({
+            success: true,
+            message: "Submissions have synced"
+        })
+    } catch (error) {
+        console.log(error);
+        res.status(500).json({
+            success: false,
+            message: error.message
+        })
+    }
+}
+
 export const langDistribution = async (req,res) => {
     try {
         const userId = req.session?.userId;
@@ -17,8 +73,6 @@ export const langDistribution = async (req,res) => {
         const allSubmissions = await lc_submission_events.find({ userId }, 
             { titleSlug: 1, lang: 1, status: 1}
         ).lean();
-
-        console.log(allSubmissions);
 
         for (const submission of allSubmissions) {
             langMap[submission.lang] = (langMap[submission.lang] || 0) + 1;
@@ -108,41 +162,6 @@ export const tagStrengths = async (req, res) => {
 
         if (!userId) return res.status(401).json({ success: false, message: "log in" });
         if (!leetcodeUsername) return res.status(400).json({ success: false, message: "link your leetcode account" });
-
-        const leetcode = new LeetCode();
-        const recentSubmissions = await leetcode.recent_submissions(leetcodeUsername);
-
-        for (const submission of recentSubmissions) {
-            const { difficulty, topicTags } = await leetcode.problem(submission.titleSlug);
-
-            await lc_problems.findOneAndUpdate(
-                { titleSlug: submission.titleSlug },
-                {
-                    titleSlug: submission.titleSlug,
-                    title: submission.title,
-                    difficulty,
-                    topicTags,
-                },{ 
-                    upsert: true, 
-                    new: true 
-                }
-            );
-
-            const ts = Number(submission.timestamp);
-
-            await lc_submission_events.findOneAndUpdate(
-                { userId, titleSlug: submission.titleSlug, timeStamp: ts },
-                {
-                userId,
-                    titleSlug: submission.titleSlug,
-                    title: submission.title,
-                    timeStamp: ts,
-                    status: submission.statusDisplay,
-                    lang: submission.lang,
-                },
-                { upsert: true, new: true }
-            );
-        }
 
         const tagMap = Object.create(null);
 
