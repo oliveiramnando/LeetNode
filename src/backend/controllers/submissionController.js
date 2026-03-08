@@ -1,15 +1,18 @@
 import { LeetCode } from "leetcode-query";
 import lc_problems from "../models/submissions/lc_problems.js";
 import lc_submission_events from "../models/submissions/lc_submission_events.js";
+import lc_daily_activity from "../models/submissions/lc_daily_activity.js";
 import mongoose from "mongoose";
 
 export const syncSubmissions = async (req,res) => {
     try {
-        const userId = req.sesson?.userId;
-        const leetcodeUsername = req.session?.leetcodeUsername;
+        // const userId = req.sesson?.userId;
+        // const leetcodeUsername = req.session?.leetcodeUsername;
 
-        if (!userId) return res.status(401).json({ success: false, message: "Please Log In"});
-        if (!leetcodeUsername) return res.status(401).json({ success: false, message: "Please Link your account"});
+        // if (!userId) return res.status(401).json({ success: false, message: "Please Log In"});
+        // if (!leetcodeUsername) return res.status(401).json({ success: false, message: "Please Link your account"});
+        const userId = new mongoose.Types.ObjectId("69a762966d5221b434ea5b1d");
+        const leetcodeUsername = 'n3m0lives';
 
         const leetcode = new LeetCode();
         const recentSubmissions = await leetcode.recent_submissions(leetcodeUsername);
@@ -31,6 +34,8 @@ export const syncSubmissions = async (req,res) => {
             );
 
             const ts = Number(submission.timestamp);
+            const date = new Date(ts * 1000);
+            const formatted = date.toISOString().slice(0, 10);
 
             await lc_submission_events.findOneAndUpdate(
                 { userId, titleSlug: submission.titleSlug, timeStamp: ts },
@@ -41,6 +46,21 @@ export const syncSubmissions = async (req,res) => {
                     timeStamp: ts,
                     status: submission.statusDisplay,
                     lang: submission.lang,
+                },
+                { upsert: true, new: true }
+            );
+
+            await lc_daily_activity.findOneAndUpdate(
+                { userId, date: formatted },
+                {
+                    userId,
+                    date: formatted,
+                    $inc: {
+                        submissions: 1,
+                        easy: difficulty === "Easy" ? 1 : 0,
+                        medium: difficulty === "Medium" ? 1 : 0,
+                        hard: difficulty === "Hard" ? 1 : 0,
+                    }
                 },
                 { upsert: true, new: true }
             );
@@ -58,6 +78,19 @@ export const syncSubmissions = async (req,res) => {
         })
     }
 }
+
+// export const updateDailyActivity = async (req,res) => {
+//     try {
+
+
+//     } catch (error) {
+//         console.log(error);
+//         res.status(500).json({
+//             success: false,
+//             message: error.message
+//         })
+//     }   
+// }
 
 export const langDistribution = async (req,res) => {
     try {
