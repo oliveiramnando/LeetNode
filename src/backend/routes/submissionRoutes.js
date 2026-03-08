@@ -3,7 +3,8 @@ import { syncSubmissions, langDistribution, difficultyPerformance, tagStrengths 
 
 const router = express.Router();
 
-router.get('sync-submissions', syncSubmissions);
+router.post('/sync-submissions', syncSubmissions);
+
 router.get('/lang-distribution', langDistribution);
 router.get('/difficulty-performance', difficultyPerformance)
 router.get('/strengths', tagStrengths);
