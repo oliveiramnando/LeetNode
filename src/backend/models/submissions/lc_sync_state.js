@@ -4,6 +4,7 @@ const lc_sync_stateSchema = mongoose.Schema({
     userId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User',
+        unique: true,
         required: true,
         index: true
     },
