@@ -16,17 +16,22 @@ const lc_daily_activitySchema = new mongoose.Schema({
         default: 0,
         min: 0,
     },
-    easy: {
+    acceptedSubmissions: {
         type: Number,
         default: 0,
         min: 0,
     },
-    medium: {
+    acceptedEasy: {
         type: Number,
         default: 0,
         min: 0,
     },
-    hard: {
+    acceptedMedium: {
+        type: Number,
+        default: 0,
+        min: 0,
+    },
+    acceptedHard: {
         type: Number,
         default: 0,
         min: 0,
