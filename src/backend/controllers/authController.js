@@ -99,7 +99,6 @@ export const githubOAuthCallback = async (req, res) => {
         const userGithubData = await axios.get(`https://api.github.com/user`, config);
         const githubUsername = userGithubData.data.login;
         const githubUrl = userGithubData.data.html_url;
-        const githubID = userGithubData.data.id
         // console.log(userGithubData);
 
         if (!githubID) {
@@ -107,16 +106,13 @@ export const githubOAuthCallback = async (req, res) => {
         }
 
         // creating new user/login
-        const user = await User.findOneAndUpdate( { githubID },
+        const user = await User.findOneAndUpdate( 
+            { githubID },
             {
-                githubID,
                 githubUsername,
                 githubUrl
-            },{
-                upsert: true,
-                new: true,
-
-            }
+            },
+            { upsert: true, returnDocument: 'after' }
         );
 
         req.session.regenerate((err) => { // generatees new session and destroys old one
@@ -145,40 +141,3 @@ export const logout = async (req,res) => {
     return;
 }
 
-export const signup = async (req,res) => {
-    try {
-        const { name } = req.body;
-        const newUser = new User({
-            name: name
-        });
-
-        const result = await newUser.save();
-        res.status(200).json({
-            success: true,
-            message: "Your account has been successfully created!",
-            user: result
-        });
-    } catch (error) {
-        return res.status(500).json({
-            message: error.message
-        });
-    }
-}
-
-export const signin = async (req,res) => {
-    try {
-        const { name } = req.body;
-        const existingUSer = await User.findOne({
-            name: name
-        });
-
-        res.status(200).json({
-            success: true,
-            existingUSer
-        });
-    } catch (error) {
-        return res.status(500).json({
-            message: error.message
-        });
-    }
-}
