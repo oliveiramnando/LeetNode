@@ -73,6 +73,8 @@ export const syncSubmissions = async (req,res) => {
                 status: submission.statusDisplay,
                 lang: submission.lang,
             });
+            
+            const accepted = submission.statusDisplay === "Accepted";
 
             await lc_daily_activity.findOneAndUpdate(
                 { userId, date: submissionDate },
@@ -83,9 +85,10 @@ export const syncSubmissions = async (req,res) => {
                     },
                     $inc: {
                         submissions: 1,
-                        easy: diff === "Easy" ? 1 : 0,
-                        medium: diff === "Medium" ? 1 : 0,
-                        hard: diff === "Hard" ? 1 : 0,
+                        acceptedSubmissions: accepted ? 1 : 0,
+                        acceptedEasy: (diff === "Easy") && accepted ? 1 : 0,
+                        acceptedMedium:(diff === "Medium") && accepted ? 1 : 0,
+                        acceptedHard: (diff === "Hard") && accepted ? 1 : 0,
                     }
                 },
                 { upsert: true, returnDocument: 'after' }
@@ -93,32 +96,53 @@ export const syncSubmissions = async (req,res) => {
         }
 
         const sevenDaysAgo = new Date(today);
-        sevenDaysAgo.setDate(today.getDate() - 7);
+        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
         const lastSnapShot = await lc_stats_snapshot.findOne({ userId: userId }).sort({ capturedAt: -1 }).lean();
-        
-        // get all daily activity from the past 7 days, compute data needed for snapshot, create new snapshot if no snap shot in past 7 days
+
+        // recompute all stats for snapshot every 7days, create new snapshot if no snap shot in past 7 days
         if (!lastSnapShot || lastSnapShot.capturedAt < sevenDaysAgo) {
-            const dailyActivity = await lc_daily_activity.find({ userId: userId, date: { $gte: sevenDaysAgo } });
+            const submissions = await lc_submission_events.find(
+                { userId: userId },
+                { titleSlug: 1, status: 1 }
+            );
 
-            let totalSubmissions = 0;
-            let easySubmissions = 0;
-            let mediumSubmissions = 0;
-            let hardSubmissions = 0;
+            const totalSubmissions = submissions.length;
+            const acceptedEvents = submissions.filter(
+                (submission) => submission.status === "Accepted"
+            );
 
-            for (const activity of dailyActivity){
-                totalSubmissions += activity.submissions || 0;
-                easySubmissions += activity.easy || 0;
-                mediumSubmissions += activity.medium || 0;
-                hardSubmissions += activity.hard || 0;
+            const totalAcceptedSubmissions = acceptedEvents.length;
+            const uniqueSolvedSlugs = [...new Set(
+                acceptedEvents.map((submission) => submission.titleSlug)
+            )];
+
+            const solvedProblems = await lc_problems.find(
+                { titleSlug: { $in: uniqueSolvedSlugs } },
+                { titleSlug: 1, difficulty: 1 }
+            ).lean();
+
+            let easySolved = 0;
+            let mediumSolved = 0;
+            let hardSolved = 0;
+
+            for (const problem of solvedProblems) {
+                if (problem.difficulty === "Easy") easySolved++;
+                else if (problem.difficulty === "Medium") mediumSolved++;
+                else if (problem.difficulty === "Hard") hardSolved++;
             }
+
+            const totalSolved = solvedProblems.length;
+            
             await lc_stats_snapshot.create({
                 userId,
                 capturedAt: today,
-                totalSubmissions: totalSubmissions,
-                easySubmissions: easySubmissions,
-                mediumSubmissions: mediumSubmissions,
-                hardSubmissions: hardSubmissions
+                totalSolved,
+                easySolved,
+                mediumSolved,
+                hardSolved,
+                totalAcceptedSubmissions,
+                totalSubmissions,
             });
         }
 
