@@ -3,15 +3,17 @@ import lc_problems from "../models/submissions/lc_problems.js";
 import lc_submission_events from "../models/submissions/lc_submission_events.js";
 import lc_daily_activity from "../models/submissions/lc_daily_activity.js";
 import lc_sync_state from "../models/submissions/lc_sync_state.js";
+import lc_stats_snapshot from "../models/submissions/lc_stats_snapshot.js";
 import mongoose from "mongoose";
 
 export const syncSubmissions = async (req,res) => {
     try {
-        const userId = req.sesson?.userId;
+        const userId = req.session?.userId;
         const leetcodeUsername = req.session?.leetcodeUsername;
 
         if (!userId) return res.status(401).json({ success: false, message: "Please Log In"});
         if (!leetcodeUsername) return res.status(401).json({ success: false, message: "Please Link your account"});
+
 
         const leetcode = new LeetCode();
         const recentSubmissions = await leetcode.recent_submissions(leetcodeUsername);
@@ -20,7 +22,7 @@ export const syncSubmissions = async (req,res) => {
         const today = new Date();
         today.setHours(0, 0, 0, 0);
 
-        const lastSync = await lc_sync_state.findOne({ userId: userId });
+        const lastSync = await lc_sync_state.findOne({ userId: userId }).lean();
         
         if (lastSync?.lastProfileSyncAt && new Date(lastSync.lastProfileSyncAt).getTime() === today.getTime()) {
             return res.status(400).json({
@@ -30,20 +32,26 @@ export const syncSubmissions = async (req,res) => {
         }
 
         for (const submission of recentSubmissions) {
-            const { difficulty, topicTags } = await leetcode.problem(submission.titleSlug);
-
-            await lc_problems.findOneAndUpdate(
-                { titleSlug: submission.titleSlug },
-                {
-                    titleSlug: submission.titleSlug,
-                    title: submission.title,
-                    difficulty,
-                    topicTags,
-                },{ 
-                    upsert: true, 
-                    new: true 
-                }
-            );
+            let diff;
+            const existingProblem = await lc_problems.findOne({ titleSlug: submission.titleSlug }).lean();
+            if (!existingProblem){ 
+                const { difficulty, topicTags } = await leetcode.problem(submission.titleSlug);
+                diff = difficulty
+                await lc_problems.findOneAndUpdate(
+                    { titleSlug: submission.titleSlug },
+                    {
+                        $setOnInsert: {
+                            titleSlug: submission.titleSlug,
+                            title: submission.title,
+                            difficulty,
+                            topicTags,
+                        }
+                    },
+                    { upsert: true, returnDocument: 'after' }
+                );
+            } else {
+                diff = existingProblem?.difficulty;
+            }
 
             const ts = Number(submission.timestamp);
             const submissionDate = new Date(ts * 1000);
@@ -53,7 +61,7 @@ export const syncSubmissions = async (req,res) => {
                 userId,
                 titleSlug: submission.titleSlug,
                 timeStamp: ts
-            })
+            }).lean();
             
             if (existingSubmission) continue;
 
@@ -69,17 +77,49 @@ export const syncSubmissions = async (req,res) => {
             await lc_daily_activity.findOneAndUpdate(
                 { userId, date: submissionDate },
                 {
-                    userId,
-                    date: submissionDate,
+                    $setOnInsert: {
+                        userId,
+                        date: submissionDate,
+                    },
                     $inc: {
                         submissions: 1,
-                        easy: difficulty === "Easy" ? 1 : 0,
-                        medium: difficulty === "Medium" ? 1 : 0,
-                        hard: difficulty === "Hard" ? 1 : 0,
+                        easy: diff === "Easy" ? 1 : 0,
+                        medium: diff === "Medium" ? 1 : 0,
+                        hard: diff === "Hard" ? 1 : 0,
                     }
                 },
-                { upsert: true, new: true }
+                { upsert: true, returnDocument: 'after' }
             );
+        }
+
+        const sevenDaysAgo = new Date(today);
+        sevenDaysAgo.setDate(today.getDate() - 7);
+
+        const lastSnapShot = await lc_stats_snapshot.findOne({ userId: userId }).sort({ capturedAt: -1 }).lean();
+        
+        // get all daily activity from the past 7 days, compute data needed for snapshot, create new snapshot if no snap shot in past 7 days
+        if (!lastSnapShot || lastSnapShot.capturedAt < sevenDaysAgo) {
+            const dailyActivity = await lc_daily_activity.find({ userId: userId, date: { $gte: sevenDaysAgo } });
+
+            let totalSubmissions = 0;
+            let easySubmissions = 0;
+            let mediumSubmissions = 0;
+            let hardSubmissions = 0;
+
+            for (const activity of dailyActivity){
+                totalSubmissions += activity.submissions || 0;
+                easySubmissions += activity.easy || 0;
+                mediumSubmissions += activity.medium || 0;
+                hardSubmissions += activity.hard || 0;
+            }
+            await lc_stats_snapshot.create({
+                userId,
+                capturedAt: today,
+                totalSubmissions: totalSubmissions,
+                easySubmissions: easySubmissions,
+                mediumSubmissions: mediumSubmissions,
+                hardSubmissions: hardSubmissions
+            });
         }
 
         await lc_sync_state.findOneAndUpdate(
@@ -90,7 +130,7 @@ export const syncSubmissions = async (req,res) => {
                     lastProfileSyncAt: today
                 }
             },
-            { upsert: true, new: true }
+            { upsert: true, returnDocument: 'after' }
         );
 
         return res.status(200).json({
@@ -99,25 +139,24 @@ export const syncSubmissions = async (req,res) => {
         });
     } catch (error) {
         console.log(error);
-        res.status(500).json({
+        return res.status(500).json({
             success: false,
             message: error.message
-        })
+        });
     }
 }
 
-// export const updateDailyActivity = async (req,res) => {
-//     try {
+export const submissionTracker = async(req,res) => {
+    try {
 
-
-//     } catch (error) {
-//         console.log(error);
-//         res.status(500).json({
-//             success: false,
-//             message: error.message
-//         })
-//     }   
-// }
+    } catch (error) {
+        console.log(error);
+        return res.status(500).json({
+            success: false,
+            message: error.message
+        });
+    }
+}
 
 export const langDistribution = async (req,res) => {
     try {
@@ -151,7 +190,7 @@ export const langDistribution = async (req,res) => {
         console.log(error);
         return res.status(500).json({
             message: error.message
-        })
+        });
     }
 }
 
@@ -204,14 +243,14 @@ export const difficultyPerformance = async (req,res) => {
             easy,
             medium,
             hard
-        })
+        });
 
     } catch (error) {
         console.log(error);
         return res.status(500).json({
             success: false,
             message: error.message
-        })
+        });
     }
 }
 
