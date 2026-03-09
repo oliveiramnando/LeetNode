@@ -2,20 +2,32 @@ import { LeetCode } from "leetcode-query";
 import lc_problems from "../models/submissions/lc_problems.js";
 import lc_submission_events from "../models/submissions/lc_submission_events.js";
 import lc_daily_activity from "../models/submissions/lc_daily_activity.js";
+import lc_sync_state from "../models/submissions/lc_sync_state.js";
 import mongoose from "mongoose";
 
 export const syncSubmissions = async (req,res) => {
     try {
-        // const userId = req.sesson?.userId;
-        // const leetcodeUsername = req.session?.leetcodeUsername;
+        const userId = req.sesson?.userId;
+        const leetcodeUsername = req.session?.leetcodeUsername;
 
-        // if (!userId) return res.status(401).json({ success: false, message: "Please Log In"});
-        // if (!leetcodeUsername) return res.status(401).json({ success: false, message: "Please Link your account"});
-        const userId = new mongoose.Types.ObjectId("69a762966d5221b434ea5b1d");
-        const leetcodeUsername = 'n3m0lives';
+        if (!userId) return res.status(401).json({ success: false, message: "Please Log In"});
+        if (!leetcodeUsername) return res.status(401).json({ success: false, message: "Please Link your account"});
 
         const leetcode = new LeetCode();
         const recentSubmissions = await leetcode.recent_submissions(leetcodeUsername);
+
+        // if there's no lastSync, make a new last Sync
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        const lastSync = await lc_sync_state.findOne({ userId: userId });
+        
+        if (lastSync?.lastProfileSyncAt && new Date(lastSync.lastProfileSyncAt).getTime() === today.getTime()) {
+            return res.status(400).json({
+                success: false,
+                message: "Already Synced For today"
+            });
+        }
 
         for (const submission of recentSubmissions) {
             const { difficulty, topicTags } = await leetcode.problem(submission.titleSlug);
@@ -34,27 +46,31 @@ export const syncSubmissions = async (req,res) => {
             );
 
             const ts = Number(submission.timestamp);
-            const date = new Date(ts * 1000);
-            const formatted = date.toISOString().slice(0, 10);
+            const submissionDate = new Date(ts * 1000);
+            submissionDate.setHours(0, 0, 0, 0);
 
-            await lc_submission_events.findOneAndUpdate(
-                { userId, titleSlug: submission.titleSlug, timeStamp: ts },
-                {
+            const existingSubmission = await lc_submission_events.findOne({
                 userId,
-                    titleSlug: submission.titleSlug,
-                    title: submission.title,
-                    timeStamp: ts,
-                    status: submission.statusDisplay,
-                    lang: submission.lang,
-                },
-                { upsert: true, new: true }
-            );
+                titleSlug: submission.titleSlug,
+                timeStamp: ts
+            })
+            
+            if (existingSubmission) continue;
+
+            await lc_submission_events.create({
+                userId,
+                titleSlug: submission.titleSlug,
+                title: submission.title,
+                timeStamp: ts,
+                status: submission.statusDisplay,
+                lang: submission.lang,
+            });
 
             await lc_daily_activity.findOneAndUpdate(
-                { userId, date: formatted },
+                { userId, date: submissionDate },
                 {
                     userId,
-                    date: formatted,
+                    date: submissionDate,
                     $inc: {
                         submissions: 1,
                         easy: difficulty === "Easy" ? 1 : 0,
@@ -66,10 +82,21 @@ export const syncSubmissions = async (req,res) => {
             );
         }
 
+        await lc_sync_state.findOneAndUpdate(
+            { userId },
+            {
+                $set: {
+                    userId,
+                    lastProfileSyncAt: today
+                }
+            },
+            { upsert: true, new: true }
+        );
+
         return res.status(200).json({
             success: true,
             message: "Submissions have synced"
-        })
+        });
     } catch (error) {
         console.log(error);
         res.status(500).json({
