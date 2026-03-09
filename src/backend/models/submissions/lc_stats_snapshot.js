@@ -11,17 +11,25 @@ const lc_stats_snapshotSchema = new mongoose.Schema({
         type: Date, // "YYYY-MM-DD"
         required: true
     },
-    totalSolved: {
-        type: Number
+    totalSubmissions: {
+        type: Number,
+        default: 0,
+        min: 0,
     },
-    easySolved: {
-        type: Number
+    easySubmissions: {
+        type: Number,
+        default: 0,
+        min: 0,
     },
-    mediumSolved: {
-        type: Number
+    mediumSubmissions: {
+        type: Number,
+        default: 0,
+        min: 0,
     },
-    hardSolved: {
-        type: Number
+    hardSubmissions: {
+        type: Number,
+        default: 0,
+        min: 0,
     },
 }, {
     timestamps: true
