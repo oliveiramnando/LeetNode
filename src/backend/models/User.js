@@ -1,21 +1,14 @@
 import mongoose from "mongoose";
 
 const UserSchema = new mongoose.Schema({
-    name: String,
-    githubID: {
-        type: Number,
-        index: true
-    },
     githubUsername: {
         type: String,
         trim: true,
         unique: true,
-        index: true
     },
     githubUrl: {
         type: String,
         trim: true,
-        index: true
     },
     leetcodeUsername: {
         type: String, 
@@ -24,7 +17,6 @@ const UserSchema = new mongoose.Schema({
     leetcodeUsernameLower: {
         type: String, 
         trim: true,
-        sparse: true
     }
 }, { timestamps: true });
 
