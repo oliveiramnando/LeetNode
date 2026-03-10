@@ -1,4 +1,3 @@
-// components/profile/BadgesSection.tsx
 import Image from "next/image";
 import type { Badge, UpcomingBadge } from "@/types/leetnode";
 import { Card, CardContent, CardHeader } from "@/components/ui/Card";
@@ -23,14 +22,29 @@ function BadgeTile({
         locked ? "opacity-70" : "hover:bg-white/10",
       ].join(" ")}
     >
-      <div className={["relative h-10 w-10 overflow-hidden rounded-xl border border-white/10 bg-white/5", locked ? "grayscale" : ""].join(" ")}>
+      <div
+        className={[
+          "relative h-10 w-10 overflow-hidden rounded-xl border border-white/10 bg-white/5",
+          locked ? "grayscale" : "",
+        ].join(" ")}
+      >
         <Image src={icon} alt={name} fill sizes="40px" className="object-cover" />
       </div>
+
       <div className="min-w-0">
         <div className="flex items-center gap-2">
           <div className="truncate text-sm font-medium text-white/90">{name}</div>
-          {locked ? <Pill className="shrink-0" tone="neutral">Locked</Pill> : <Pill className="shrink-0" tone="success">Earned</Pill>}
+          {locked ? (
+            <Pill className="shrink-0" tone="neutral">
+              Locked
+            </Pill>
+          ) : (
+            <Pill className="shrink-0" tone="success">
+              Earned
+            </Pill>
+          )}
         </div>
+
         {meta ? <div className="mt-1 text-xs text-white/55">{meta}</div> : null}
       </div>
     </div>
@@ -50,8 +64,8 @@ export function BadgesSection({
   const upcoming = upcomingBadges ?? [];
 
   return (
-    <Card>
-      <CardHeader>
+    <Card className="lg:h-[380px] flex flex-col overflow-hidden">
+      <CardHeader className="shrink-0">
         <SectionHeader
           title="Badges"
           subtitle="Earned badges + upcoming challenges (locked)."
@@ -59,40 +73,50 @@ export function BadgesSection({
         />
       </CardHeader>
 
-      <CardContent className="space-y-6">
-        <div>
-          <div className="mb-2 text-xs font-semibold text-white/70">Earned</div>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            {earned.length ? (
-              earned.map((b) => (
-                <BadgeTile
-                  key={b.id}
-                  name={b.displayName}
-                  icon={b.icon}
-                  meta={`Earned on ${b.creationDate}`}
-                  locked={false}
-                />
-              ))
-            ) : (
-              <div className="rounded-xl border border-dashed border-white/15 bg-white/5 p-4 text-sm text-white/60">
-                No earned badges yet.
+      <CardContent className="min-h-0 flex-1 overflow-hidden">
+        <div className="h-full overflow-y-auto pr-2">
+          <div className="space-y-6">
+            <div>
+              <div className="mb-2 text-xs font-semibold text-white/70">Earned</div>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                {earned.length ? (
+                  earned.map((b) => (
+                    <BadgeTile
+                      key={b.id}
+                      name={b.displayName}
+                      icon={b.icon}
+                      meta={`Earned on ${b.creationDate}`}
+                      locked={false}
+                    />
+                  ))
+                ) : (
+                  <div className="rounded-xl border border-dashed border-white/15 bg-white/5 p-4 text-sm text-white/60">
+                    No earned badges yet.
+                  </div>
+                )}
               </div>
-            )}
-          </div>
-        </div>
+            </div>
 
-        <div>
-          <div className="mb-2 text-xs font-semibold text-white/70">Upcoming</div>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            {upcoming.length ? (
-              upcoming.map((b) => (
-                <BadgeTile key={b.name} name={b.name} icon={b.icon} meta="Complete the challenge to unlock" locked />
-              ))
-            ) : (
-              <div className="rounded-xl border border-dashed border-white/15 bg-white/5 p-4 text-sm text-white/60">
-                No upcoming badges.
+            <div>
+              <div className="mb-2 text-xs font-semibold text-white/70">Upcoming</div>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                {upcoming.length ? (
+                  upcoming.map((b) => (
+                    <BadgeTile
+                      key={b.name}
+                      name={b.name}
+                      icon={b.icon}
+                      meta="Complete the challenge to unlock"
+                      locked
+                    />
+                  ))
+                ) : (
+                  <div className="rounded-xl border border-dashed border-white/15 bg-white/5 p-4 text-sm text-white/60">
+                    No upcoming badges.
+                  </div>
+                )}
               </div>
-            )}
+            </div>
           </div>
         </div>
       </CardContent>

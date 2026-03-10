@@ -1,4 +1,3 @@
-// src/frontend/src/components/profile/ProfileSections.tsx
 "use client";
 
 import React, { useMemo, useState } from "react";
@@ -97,8 +96,9 @@ export function ProfileSections({
       <div className="rounded-2xl border border-zinc-700/40 bg-[#1f1f1f] p-4">
         {tab === "stats" ? (
           <div className="space-y-6">
-            <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 lg:items-start">
               <SolvedOverviewCard metrics={solvedMetrics} />
+
               <BadgesSection
                 badges={matched.badges}
                 upcomingBadges={matched.upcomingBadges}
