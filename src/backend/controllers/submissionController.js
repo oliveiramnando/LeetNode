@@ -174,12 +174,10 @@ export const submissionTracker = async(req,res) => {
     try {
         const userId = req.session?.userId;
         if (!userId) return res.status(401).json({ success:false, message: "Please log in" });
-
-
         
-        const allSubmissions = await lc_daily_activity.find({ userId: userId }).sort({ date: 1}).lean();
+        const allDailyActivity = await lc_daily_activity.find({ userId: userId }).sort({ date: 1}).lean();
 
-        if (allSubmissions.length === 0) {
+        if (allDailyActivity.length === 0) {
             return res.status(200).json({
                 success: true,
                 total_submissions: 0,
@@ -191,28 +189,34 @@ export const submissionTracker = async(req,res) => {
         }
 
         let totalSubmissions = 0;
-        const activeDays = allSubmissions.length;
+        const activeDays = allDailyActivity.length;
 
         let longest_streak = 1;
         let current_streak = 1;
-        let most_active_day = allSubmissions[1];
+        let most_active_day = allDailyActivity[0];
 
-        let recentDay;
 
-        for (const submission of allSubmissions) {
-            totalSubmissions += submission.submissions;
+        for (let i = 0; i < allDailyActivity.length; i++) {
+            const activity = allDailyActivity[i];
+            totalSubmissions += activity.submissions;
 
-            const prevDay = new Date(submission.date);
-            prevDay.setDate(prevDay.getDate() - 1);
+            if (activity.submissions > most_active_day.submissions)  {
+                most_active_day = activity;
+            }
 
-            if (!most_active_day?.submissions || submission?.submissions >= most_active_day?.submissions) most_active_day = submission;
+            if (i > 0) {
+                const prev = new Date(allDailyActivity[i - 1].date);
+                const curr = new Date(activity.date);
 
-            if (!prevDay || recentDay < prevDay) {
-                recentDay = submission?.date; // if current submission is first, or is more than one day apart
-                current_streak = 1
-            } else {
-                current_streak += 1 
-                if (current_streak > longest_streak) longest_streak = current_streak;
+                const diffInMs = curr - prev;
+                const diffInDays = diffInMs / (1000 * 60 * 60 * 24);
+
+                if (diffInDays === 1) { 
+                    current_streak += 1;
+                    if (current_streak > longest_streak) longest_streak = current_streak;
+                } else {
+                    current_streak = 1
+                }
             }
         }
 
