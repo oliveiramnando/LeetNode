@@ -1,6 +1,10 @@
 import mongoose from "mongoose";
 
 const UserSchema = new mongoose.Schema({
+    githubID: {
+        type: Number,
+        index: true
+    },
     githubUsername: {
         type: String,
         trim: true,
