@@ -5,12 +5,6 @@ import React from "react";
 import { useAuth } from "@/components/auth/AuthProvider";
 import {
   ResponsiveContainer,
-  RadarChart,
-  PolarGrid,
-  PolarAngleAxis,
-  PolarRadiusAxis,
-  Radar,
-  Tooltip,
   PieChart,
   Pie,
   Cell,
@@ -19,25 +13,12 @@ import {
   XAxis,
   YAxis,
   CartesianGrid,
+  Tooltip,
 } from "recharts";
 
 function normalizeLc(username: any) {
   return String(username || "").trim().toLowerCase();
 }
-
-type TagStrengthsResponse =
-  | { success: false; message?: string }
-  | {
-      success: true;
-      tags?: Array<{ tag: string; acceptedCount: number }>;
-      tagMap?: Record<string, number>;
-      stats?: {
-        acceptedSubmissionsCount?: number;
-        uniqueAcceptedProblemsCount?: number;
-        tagCount?: number;
-        lastUpdated?: string;
-      };
-    };
 
 type LangDistributionResponse =
   | { success: false; message?: string }
@@ -73,84 +54,6 @@ type SubmissionTrackerResponse =
       } | null;
     };
 
-const TOPICS = [
-  "Arrays",
-  "Strings",
-  "Hashing",
-  "Two Pointers",
-  "Sliding Window",
-  "Binary Search",
-  "Sorting",
-  "Stack",
-  "Queue",
-  "Linked Lists",
-  "Trees",
-  "Binary Search Trees",
-  "Heaps",
-  "Graphs",
-  "Dynamic Programming",
-  "Greedy",
-  "Backtracking",
-  "Bit Manipulation",
-  "Math",
-  "Union Find",
-  "Prefix Sum",
-  "Recursion",
-  "Divide and Conquer",
-  "Design",
-  "Simulation",
-  "Geometry",
-  "Number Theory",
-] as const;
-
-type Topic = (typeof TOPICS)[number];
-
-const TAG_TO_TOPIC: Record<string, Topic> = {
-  Array: "Arrays",
-  String: "Strings",
-  "Hash Table": "Hashing",
-  "Two Pointers": "Two Pointers",
-  "Sliding Window": "Sliding Window",
-  "Binary Search": "Binary Search",
-  Sorting: "Sorting",
-  Stack: "Stack",
-  Queue: "Queue",
-  "Linked List": "Linked Lists",
-  Tree: "Trees",
-  "Binary Tree": "Trees",
-  "Binary Search Tree": "Binary Search Trees",
-  Heap: "Heaps",
-  "Heap (Priority Queue)": "Heaps",
-  Graph: "Graphs",
-  "Dynamic Programming": "Dynamic Programming",
-  Greedy: "Greedy",
-  Backtracking: "Backtracking",
-  "Bit Manipulation": "Bit Manipulation",
-  Math: "Math",
-  "Union Find": "Union Find",
-  "Prefix Sum": "Prefix Sum",
-  Recursion: "Recursion",
-  "Divide and Conquer": "Divide and Conquer",
-  Design: "Design",
-  Simulation: "Simulation",
-  Geometry: "Geometry",
-  "Number Theory": "Number Theory",
-
-  "Depth-First Search": "Graphs",
-  "Breadth-First Search": "Graphs",
-  "Topological Sort": "Graphs",
-  "Shortest Path": "Graphs",
-
-  "Monotonic Stack": "Stack",
-  "Monotonic Queue": "Queue",
-
-  Trie: "Trees",
-  "Segment Tree": "Trees",
-
-  "Binary Indexed Tree": "Prefix Sum",
-  "Fenwick Tree": "Prefix Sum",
-};
-
 const PIE_COLORS = [
   "#f97316",
   "#fb923c",
@@ -163,20 +66,6 @@ const PIE_COLORS = [
   "#22c55e",
   "#94a3b8",
 ];
-
-function buildTopicDistribution(tagMap: Record<string, number>) {
-  const base: Record<Topic, number> = Object.fromEntries(
-    TOPICS.map((t) => [t, 0])
-  ) as Record<Topic, number>;
-
-  for (const [tag, count] of Object.entries(tagMap || {})) {
-    const topic = TAG_TO_TOPIC[tag];
-    if (!topic) continue;
-    base[topic] += count;
-  }
-
-  return TOPICS.map((topic) => ({ topic, count: base[topic] }));
-}
 
 function recordToPieData(map: Record<string, number>) {
   return Object.entries(map || {})
@@ -715,7 +604,6 @@ export function SubmissionsAnalysisPanel({
   profileUsername: string;
 }) {
   const { loading, loggedIn, user } = useAuth();
-  const [data, setData] = React.useState<TagStrengthsResponse | null>(null);
   const [langData, setLangData] =
     React.useState<LangDistributionResponse | null>(null);
   const [diffData, setDiffData] =
@@ -746,13 +634,7 @@ export function SubmissionsAnalysisPanel({
         const backend =
           process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8080";
 
-        const [strengthsRes, langRes, diffRes, trackerRes] = await Promise.all([
-          fetch(`${backend}/api/submissions/strengths`, {
-            method: "GET",
-            credentials: "include",
-            headers: { Accept: "application/json" },
-            cache: "no-store",
-          }),
+        const [langRes, diffRes, trackerRes] = await Promise.all([
           fetch(`${backend}/api/submissions/lang-distribution`, {
             method: "GET",
             credentials: "include",
@@ -773,8 +655,6 @@ export function SubmissionsAnalysisPanel({
           }),
         ]);
 
-        const strengthsJson =
-          (await strengthsRes.json()) as TagStrengthsResponse;
         const langJson = (await langRes.json()) as LangDistributionResponse;
         const diffJson =
           (await diffRes.json()) as DifficultyPerformanceResponse;
@@ -782,16 +662,11 @@ export function SubmissionsAnalysisPanel({
           (await trackerRes.json()) as SubmissionTrackerResponse;
 
         if (!alive) return;
-        setData(strengthsJson);
         setLangData(langJson);
         setDiffData(diffJson);
         setTrackerData(trackerJson);
       } catch (e: any) {
         if (!alive) return;
-        setData({
-          success: false,
-          message: e?.message ?? "Failed to load tag strengths.",
-        });
         setLangData({
           success: false,
           message: e?.message ?? "Failed to load language distribution.",
@@ -830,24 +705,6 @@ export function SubmissionsAnalysisPanel({
     );
   }
 
-  const tagMap =
-    data && data.success === true ? data.tagMap ?? {} : {};
-
-  const tags =
-    data && data.success === true
-      ? (
-          data.tags ??
-          Object.entries(tagMap).map(([tag, acceptedCount]) => ({
-            tag,
-            acceptedCount,
-          }))
-        ).sort((a, b) => b.acceptedCount - a.acceptedCount)
-      : [];
-
-  const maxBars = Math.max(1, ...tags.map((t) => t.acceptedCount));
-  const topicData = buildTopicDistribution(tagMap);
-  const topicMax = Math.max(1, ...topicData.map((d) => d.count));
-
   const langMap =
     langData && langData.success === true ? langData.langMap ?? {} : {};
 
@@ -883,31 +740,11 @@ export function SubmissionsAnalysisPanel({
             </div>
             <div className="mt-2 max-w-2xl text-sm text-zinc-400">
               A sharper view of how you solve: difficulty conversion, language
-              preferences, streaks, pacing, top strengths, and topic coverage.
+              preferences, streaks, and submission pace.
             </div>
           </div>
 
           <div className="flex flex-wrap gap-2">
-            {data && data.success === true && data.stats && (
-              <>
-                {typeof data.stats.uniqueAcceptedProblemsCount === "number" && (
-                  <StatPill
-                    label="Unique solved"
-                    value={data.stats.uniqueAcceptedProblemsCount}
-                  />
-                )}
-                {typeof data.stats.acceptedSubmissionsCount === "number" && (
-                  <StatPill
-                    label="Accepted submissions"
-                    value={data.stats.acceptedSubmissionsCount}
-                  />
-                )}
-                {typeof data.stats.tagCount === "number" && (
-                  <StatPill label="Tags" value={data.stats.tagCount} />
-                )}
-              </>
-            )}
-
             {trackerOk &&
               typeof trackerData.total_submissions === "number" && (
                 <StatPill
@@ -925,6 +762,16 @@ export function SubmissionsAnalysisPanel({
                   }`}
                 />
               )}
+
+            {trackerOk &&
+              typeof trackerData.longest_streak === "number" && (
+                <StatPill
+                  label="Longest streak"
+                  value={`${trackerData.longest_streak} day${
+                    trackerData.longest_streak === 1 ? "" : "s"
+                  }`}
+                />
+              )}
           </div>
         </div>
       </div>
@@ -932,18 +779,6 @@ export function SubmissionsAnalysisPanel({
       {loadingData ? (
         <div className="rounded-3xl border border-white/10 bg-[linear-gradient(180deg,rgba(36,36,36,0.96),rgba(24,24,27,0.96))] p-6 text-sm text-zinc-300">
           Loading…
-        </div>
-      ) : !data ? (
-        <div className="rounded-3xl border border-white/10 bg-[linear-gradient(180deg,rgba(36,36,36,0.96),rgba(24,24,27,0.96))] p-6 text-sm text-zinc-300">
-          No data yet.
-        </div>
-      ) : data.success === false ? (
-        <div className="rounded-3xl border border-red-500/20 bg-[linear-gradient(180deg,rgba(36,36,36,0.96),rgba(24,24,27,0.96))] p-6 text-sm text-red-400">
-          {data.message ?? "Failed to load."}
-        </div>
-      ) : tags.length === 0 ? (
-        <div className="rounded-3xl border border-white/10 bg-[linear-gradient(180deg,rgba(36,36,36,0.96),rgba(24,24,27,0.96))] p-6 text-sm text-zinc-300">
-          No accepted submissions found yet.
         </div>
       ) : (
         <>
@@ -1015,90 +850,6 @@ export function SubmissionsAnalysisPanel({
                 totalLabel="submissions"
               />
             </div>
-          </div>
-
-          <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
-            <SectionCard
-              title="Top Tags"
-              subtitle="Based on unique solved problems."
-              right={
-                <div className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-xs text-zinc-400">
-                  All {tags.length}
-                </div>
-              }
-              className="h-full"
-            >
-              <div className="h-[420px] overflow-y-auto pr-2">
-                <div className="space-y-4">
-                  {tags.map((t, idx) => {
-                    const width = Math.round((t.acceptedCount / maxBars) * 100);
-                    const tone = PIE_COLORS[idx % PIE_COLORS.length];
-
-                    return (
-                      <div key={t.tag} className="space-y-2">
-                        <div className="flex items-center justify-between gap-3 text-sm">
-                          <span className="truncate font-medium text-zinc-100">
-                            {t.tag}
-                          </span>
-                          <span className="rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 text-xs text-zinc-400">
-                            {t.acceptedCount}
-                          </span>
-                        </div>
-
-                        <div className="h-2.5 w-full overflow-hidden rounded-full bg-white/[0.06]">
-                          <div
-                            className="h-full rounded-full"
-                            style={{
-                              width: `${width}%`,
-                              background: `linear-gradient(90deg, ${tone}, #fb923c)`,
-                            }}
-                          />
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            </SectionCard>
-
-            <SectionCard
-              title="Topic Tags Distribution"
-              subtitle="Mapped from LeetCode tags into broader topic buckets."
-              className="h-full"
-            >
-              <div className="h-[420px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <RadarChart data={topicData}>
-                    <PolarGrid stroke="rgba(255,255,255,0.12)" />
-                    <PolarAngleAxis
-                      dataKey="topic"
-                      tick={{ fontSize: 10, fill: "#d4d4d8" }}
-                    />
-                    <PolarRadiusAxis
-                      domain={[0, topicMax]}
-                      tick={{ fontSize: 10, fill: "#71717a" }}
-                      axisLine={false}
-                    />
-                    <Tooltip
-                      formatter={(value: any) => [value, "Count"]}
-                      labelFormatter={(label: any) => String(label)}
-                      contentStyle={{
-                        background: "#18181b",
-                        border: "1px solid rgba(255,255,255,0.08)",
-                        borderRadius: 16,
-                        color: "#fff",
-                      }}
-                    />
-                    <Radar
-                      dataKey="count"
-                      stroke="#f97316"
-                      fill="#f97316"
-                      fillOpacity={0.22}
-                    />
-                  </RadarChart>
-                </ResponsiveContainer>
-              </div>
-            </SectionCard>
           </div>
         </>
       )}

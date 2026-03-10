@@ -1,3 +1,4 @@
+// src/frontend/src/app/profile/[username]/submissions/page.tsx
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
