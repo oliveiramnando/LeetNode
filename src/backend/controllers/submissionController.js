@@ -172,6 +172,59 @@ export const syncSubmissions = async (req,res) => {
 
 export const submissionTracker = async(req,res) => {
     try {
+        const userId = req.session?.userId;
+        if (!userId) return res.status(401).json({ success:false, message: "Please log in" });
+
+
+        
+        const allSubmissions = await lc_daily_activity.find({ userId: userId }).sort({ date: 1}).lean();
+
+        if (allSubmissions.length === 0) {
+            return res.status(200).json({
+                success: true,
+                total_submissions: 0,
+                avg_submissions_per_day: 0,
+                longest_streak: 0,
+                current_streak: 0,
+                most_active_day: null,
+            });
+        }
+
+        let totalSubmissions = 0;
+        const activeDays = allSubmissions.length;
+
+        let longest_streak = 1;
+        let current_streak = 1;
+        let most_active_day = allSubmissions[1];
+
+        let recentDay;
+
+        for (const submission of allSubmissions) {
+            totalSubmissions += submission.submissions;
+
+            const prevDay = new Date(submission.date);
+            prevDay.setDate(prevDay.getDate() - 1);
+
+            if (!most_active_day?.submissions || submission?.submissions >= most_active_day?.submissions) most_active_day = submission;
+
+            if (!prevDay || recentDay < prevDay) {
+                recentDay = submission?.date; // if current submission is first, or is more than one day apart
+                current_streak = 1
+            } else {
+                current_streak += 1 
+                if (current_streak > longest_streak) longest_streak = current_streak;
+            }
+        }
+
+        const avg_submissions_per_day = totalSubmissions / activeDays;
+
+        return res.status(200).json({
+            success: true,
+            avg_submissions_per_day,
+            longest_streak,
+            current_streak,
+            most_active_day
+        })
 
     } catch (error) {
         console.log(error);
