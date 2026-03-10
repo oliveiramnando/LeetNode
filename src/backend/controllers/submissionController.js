@@ -172,8 +172,10 @@ export const syncSubmissions = async (req,res) => {
 
 export const submissionTracker = async(req,res) => {
     try {
-        const userId = req.session?.userId;
-        if (!userId) return res.status(401).json({ success:false, message: "Please log in" });
+        // const userId = req.session?.userId;
+        // if (!userId) return res.status(401).json({ success:false, message: "Please log in" });
+        const userId = new mongoose.Types.ObjectId("69a762966d5221b434ea5b1d");
+        const leetcodeUsername = 'n3m0lives';
         
         const allDailyActivity = await lc_daily_activity.find({ userId: userId }).sort({ date: 1}).lean();
 
@@ -192,7 +194,7 @@ export const submissionTracker = async(req,res) => {
         const activeDays = allDailyActivity.length;
 
         let longest_streak = 1;
-        let current_streak = 1;
+        let running_streak = 1;
         let most_active_day = allDailyActivity[0];
 
 
@@ -212,11 +214,26 @@ export const submissionTracker = async(req,res) => {
                 const diffInDays = diffInMs / (1000 * 60 * 60 * 24);
 
                 if (diffInDays === 1) { 
-                    current_streak += 1;
-                    if (current_streak > longest_streak) longest_streak = current_streak;
+                    running_streak += 1;
+                    if (running_streak > longest_streak) longest_streak = running_streak;
                 } else {
-                    current_streak = 1
+                    running_streak = 1
                 }
+            }
+        }
+
+        let current_streak = 1;
+        for (let i = allDailyActivity.length - 1; i > 0; i--) {
+            const prev = new Date(allDailyActivity[i - 1].date);
+            const curr = new Date(allDailyActivity[i].date);
+
+            const diffInMs = curr - prev;
+            const diffInDays = diffInMs / (1000 * 60 * 60 * 24);
+
+            if (diffInDays === 1) {
+                current_streak += 1;
+            } else {
+                break;
             }
         }
 
