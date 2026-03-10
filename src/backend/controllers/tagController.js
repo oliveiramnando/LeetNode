@@ -82,13 +82,13 @@ export const tagWeaknesses = async (req, res) => {
 
             if (!problemStats[slug]) {
                 problemStats[slug] = {
-                    attempted: false,
-                    accepted: false,
+                    attempted: 0,
+                    accepted: 0,
                 };
             }
-            problemStats[slug].attempted = true;
+            problemStats[slug].attempted += 1;
 
-            if (sub.status === "Accepted") problemStats[slug].accepted = true;
+            if (sub.status === "Accepted") problemStats[slug].accepted += 1;
         }
 
         const submissionSlugs = Object.keys(problemStats);
@@ -120,8 +120,8 @@ export const tagWeaknesses = async (req, res) => {
                     };
                 }
 
-                if (stats.attempted) tagMap[name].attemptedProblems += 1;
-                if (stats.accepted) tagMap[name].acceptedProblems += 1; 
+                tagMap[name].attemptedProblems += stats.attempted;
+                tagMap[name].acceptedProblems += stats.accepted; 
             }
         }
 
