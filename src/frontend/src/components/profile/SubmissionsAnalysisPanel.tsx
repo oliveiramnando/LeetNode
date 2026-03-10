@@ -14,6 +14,11 @@ import {
   PieChart,
   Pie,
   Cell,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
 } from "recharts";
 
 function normalizeLc(username: any) {
@@ -49,6 +54,23 @@ type DifficultyPerformanceResponse =
       easy?: [number, number];
       medium?: [number, number];
       hard?: [number, number];
+    };
+
+type SubmissionTrackerResponse =
+  | { success: false; message?: string }
+  | {
+      success: true;
+      total_submissions?: number;
+      avg_submissions_per_day?: number;
+      longest_streak?: number;
+      current_streak?: number;
+      most_active_day?: {
+        date?: string;
+        submissions?: number;
+        easy?: number;
+        medium?: number;
+        hard?: number;
+      } | null;
     };
 
 const TOPICS = [
@@ -177,6 +199,22 @@ function formatLabel(value: string) {
   return value;
 }
 
+function formatDate(value?: string) {
+  if (!value) return "—";
+  const d = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(d.getTime())) return value;
+  return d.toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+function formatAvg(value?: number) {
+  if (typeof value !== "number" || Number.isNaN(value)) return "0.0";
+  return value.toFixed(1);
+}
+
 function SectionCard({
   title,
   subtitle,
@@ -218,6 +256,26 @@ function StatPill({ label, value }: { label: string; value: React.ReactNode }) {
     <div className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-xs text-zinc-300">
       <span className="text-zinc-400">{label}:</span>{" "}
       <span className="font-medium text-zinc-100">{value}</span>
+    </div>
+  );
+}
+
+function MetricMiniCard({
+  label,
+  value,
+  hint,
+}: {
+  label: string;
+  value: React.ReactNode;
+  hint?: React.ReactNode;
+}) {
+  return (
+    <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+      <div className="text-xs font-medium uppercase tracking-[0.18em] text-zinc-500">
+        {label}
+      </div>
+      <div className="mt-2 text-2xl font-semibold text-white">{value}</div>
+      {hint ? <div className="mt-1 text-xs text-zinc-400">{hint}</div> : null}
     </div>
   );
 }
@@ -455,6 +513,202 @@ function DonutMetricCard({
   );
 }
 
+function SubmissionTrackerCard({
+  tracker,
+}: {
+  tracker: SubmissionTrackerResponse | null;
+}) {
+  const ok = !!tracker && tracker.success === true;
+
+  const totalSubmissions = ok ? tracker.total_submissions ?? 0 : 0;
+  const avgPerDay = ok ? tracker.avg_submissions_per_day ?? 0 : 0;
+  const longestStreak = ok ? tracker.longest_streak ?? 0 : 0;
+  const currentStreak = ok ? tracker.current_streak ?? 0 : 0;
+  const mostActiveDay = ok ? tracker.most_active_day ?? null : null;
+  const mostActiveCount = mostActiveDay?.submissions ?? 0;
+
+  const chartData = [
+    { name: "Current", value: currentStreak },
+    { name: "Longest", value: longestStreak },
+    { name: "Avg/Day", value: Number(avgPerDay.toFixed(1)) },
+    { name: "Best Day", value: mostActiveCount },
+  ];
+
+  if (!tracker) {
+    return (
+      <SectionCard
+        title="Submission Tracker"
+        subtitle="Current streak, longest streak, submission pace, and best day."
+        className="h-full"
+      >
+        <div className="flex h-[320px] items-center justify-center rounded-2xl border border-dashed border-white/10 bg-white/[0.02] text-sm text-zinc-400">
+          No tracker data yet.
+        </div>
+      </SectionCard>
+    );
+  }
+
+  if (tracker.success === false) {
+    return (
+      <SectionCard
+        title="Submission Tracker"
+        subtitle="Current streak, longest streak, submission pace, and best day."
+        className="h-full"
+      >
+        <div className="flex h-[320px] items-center justify-center rounded-2xl border border-red-500/20 bg-red-500/[0.04] text-sm text-red-400">
+          {tracker.message ?? "Failed to load submission tracker."}
+        </div>
+      </SectionCard>
+    );
+  }
+
+  return (
+    <SectionCard
+      title="Submission Tracker"
+      subtitle="Current streak, longest streak, submission pace, and best day."
+      className="h-full"
+      right={
+        <div className="rounded-full border border-orange-500/20 bg-orange-500/10 px-3 py-1 text-xs text-orange-300">
+          Live from tracker API
+        </div>
+      }
+    >
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,1.1fr)_minmax(260px,0.9fr)]">
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <MetricMiniCard
+              label="Current streak"
+              value={currentStreak}
+              hint="Consecutive active days"
+            />
+            <MetricMiniCard
+              label="Longest streak"
+              value={longestStreak}
+              hint="Best recorded run"
+            />
+            <MetricMiniCard
+              label="Avg submissions/day"
+              value={formatAvg(avgPerDay)}
+              hint="Across active days"
+            />
+            <MetricMiniCard
+              label="Total submissions"
+              value={totalSubmissions}
+              hint="From tracked daily activity"
+            />
+          </div>
+
+          <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <div className="text-xs font-medium uppercase tracking-[0.18em] text-zinc-500">
+                  Most active day
+                </div>
+                <div className="mt-2 text-lg font-semibold text-white">
+                  {formatDate(mostActiveDay?.date)}
+                </div>
+                <div className="mt-1 text-sm text-zinc-400">
+                  {mostActiveCount} submissions on your busiest tracked day.
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-orange-500/20 bg-orange-500/10 px-4 py-3 text-center">
+                <div className="text-xs uppercase tracking-[0.18em] text-orange-300">
+                  Best day
+                </div>
+                <div className="mt-1 text-2xl font-semibold text-white">
+                  {mostActiveCount}
+                </div>
+              </div>
+            </div>
+
+            {(typeof mostActiveDay?.easy === "number" ||
+              typeof mostActiveDay?.medium === "number" ||
+              typeof mostActiveDay?.hard === "number") && (
+              <div className="mt-4 grid grid-cols-3 gap-3">
+                <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3 text-center">
+                  <div className="text-xs uppercase tracking-[0.18em] text-zinc-500">
+                    Easy
+                  </div>
+                  <div className="mt-1 text-lg font-semibold text-emerald-400">
+                    {mostActiveDay?.easy ?? 0}
+                  </div>
+                </div>
+                <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3 text-center">
+                  <div className="text-xs uppercase tracking-[0.18em] text-zinc-500">
+                    Medium
+                  </div>
+                  <div className="mt-1 text-lg font-semibold text-amber-400">
+                    {mostActiveDay?.medium ?? 0}
+                  </div>
+                </div>
+                <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3 text-center">
+                  <div className="text-xs uppercase tracking-[0.18em] text-zinc-500">
+                    Hard
+                  </div>
+                  <div className="mt-1 text-lg font-semibold text-rose-400">
+                    {mostActiveDay?.hard ?? 0}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.02))] p-4">
+          <div className="mb-3">
+            <div className="text-xs font-medium uppercase tracking-[0.18em] text-zinc-500">
+              Tracker comparison
+            </div>
+            <div className="mt-1 text-sm text-zinc-400">
+              Streak and pace metrics from your daily activity snapshot.
+            </div>
+          </div>
+
+          <div className="h-[310px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={chartData} barCategoryGap={26}>
+                <CartesianGrid
+                  stroke="rgba(255,255,255,0.08)"
+                  vertical={false}
+                />
+                <XAxis
+                  dataKey="name"
+                  tick={{ fill: "#d4d4d8", fontSize: 12 }}
+                  axisLine={false}
+                  tickLine={false}
+                />
+                <YAxis
+                  tick={{ fill: "#71717a", fontSize: 12 }}
+                  axisLine={false}
+                  tickLine={false}
+                  allowDecimals
+                />
+                <Tooltip
+                  formatter={(value: any) => [value, "Value"]}
+                  contentStyle={{
+                    background: "#18181b",
+                    border: "1px solid rgba(255,255,255,0.08)",
+                    borderRadius: 16,
+                    color: "#fff",
+                  }}
+                  cursor={{ fill: "rgba(255,255,255,0.03)" }}
+                />
+                <Bar
+                  dataKey="value"
+                  radius={[12, 12, 6, 6]}
+                  fill="#f97316"
+                  isAnimationActive={false}
+                />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      </div>
+    </SectionCard>
+  );
+}
+
 export function SubmissionsAnalysisPanel({
   profileUsername,
 }: {
@@ -466,6 +720,8 @@ export function SubmissionsAnalysisPanel({
     React.useState<LangDistributionResponse | null>(null);
   const [diffData, setDiffData] =
     React.useState<DifficultyPerformanceResponse | null>(null);
+  const [trackerData, setTrackerData] =
+    React.useState<SubmissionTrackerResponse | null>(null);
 
   const [loadingData, setLoadingData] = React.useState(false);
 
@@ -490,7 +746,7 @@ export function SubmissionsAnalysisPanel({
         const backend =
           process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8080";
 
-        const [strengthsRes, langRes, diffRes] = await Promise.all([
+        const [strengthsRes, langRes, diffRes, trackerRes] = await Promise.all([
           fetch(`${backend}/api/submissions/strengths`, {
             method: "GET",
             credentials: "include",
@@ -509,16 +765,27 @@ export function SubmissionsAnalysisPanel({
             headers: { Accept: "application/json" },
             cache: "no-store",
           }),
+          fetch(`${backend}/api/submissions/submission-tracker`, {
+            method: "GET",
+            credentials: "include",
+            headers: { Accept: "application/json" },
+            cache: "no-store",
+          }),
         ]);
 
-        const strengthsJson = (await strengthsRes.json()) as TagStrengthsResponse;
+        const strengthsJson =
+          (await strengthsRes.json()) as TagStrengthsResponse;
         const langJson = (await langRes.json()) as LangDistributionResponse;
-        const diffJson = (await diffRes.json()) as DifficultyPerformanceResponse;
+        const diffJson =
+          (await diffRes.json()) as DifficultyPerformanceResponse;
+        const trackerJson =
+          (await trackerRes.json()) as SubmissionTrackerResponse;
 
         if (!alive) return;
         setData(strengthsJson);
         setLangData(langJson);
         setDiffData(diffJson);
+        setTrackerData(trackerJson);
       } catch (e: any) {
         if (!alive) return;
         setData({
@@ -532,6 +799,10 @@ export function SubmissionsAnalysisPanel({
         setDiffData({
           success: false,
           message: e?.message ?? "Failed to load difficulty performance.",
+        });
+        setTrackerData({
+          success: false,
+          message: e?.message ?? "Failed to load submission tracker.",
         });
       } finally {
         if (!alive) return;
@@ -560,10 +831,10 @@ export function SubmissionsAnalysisPanel({
   }
 
   const tagMap =
-    data && "success" in data && data.success === true ? data.tagMap ?? {} : {};
+    data && data.success === true ? data.tagMap ?? {} : {};
 
   const tags =
-    data && "success" in data && data.success === true
+    data && data.success === true
       ? (
           data.tags ??
           Object.entries(tagMap).map(([tag, acceptedCount]) => ({
@@ -578,29 +849,20 @@ export function SubmissionsAnalysisPanel({
   const topicMax = Math.max(1, ...topicData.map((d) => d.count));
 
   const langMap =
-    langData && "success" in langData && langData.success === true
-      ? langData.langMap ?? {}
-      : {};
+    langData && langData.success === true ? langData.langMap ?? {} : {};
+
   const acceptedLangMap =
-    langData && "success" in langData && langData.success === true
+    langData && langData.success === true
       ? langData.acceptedLangMap ?? {}
       : {};
 
   const langPie = recordToPieData(langMap);
   const acceptedLangPie = recordToPieData(acceptedLangMap);
 
-  const easy =
-    diffData && "success" in diffData && diffData.success
-      ? diffData.easy
-      : undefined;
+  const easy = diffData && diffData.success === true ? diffData.easy : undefined;
   const medium =
-    diffData && "success" in diffData && diffData.success
-      ? diffData.medium
-      : undefined;
-  const hard =
-    diffData && "success" in diffData && diffData.success
-      ? diffData.hard
-      : undefined;
+    diffData && diffData.success === true ? diffData.medium : undefined;
+  const hard = diffData && diffData.success === true ? diffData.hard : undefined;
 
   const easyA = easy?.[0] ?? 0;
   const easyT = easy?.[1] ?? 0;
@@ -608,6 +870,8 @@ export function SubmissionsAnalysisPanel({
   const medT = medium?.[1] ?? 0;
   const hardA = hard?.[0] ?? 0;
   const hardT = hard?.[1] ?? 0;
+
+  const trackerOk = trackerData && trackerData.success === true;
 
   return (
     <div className="space-y-5">
@@ -619,29 +883,49 @@ export function SubmissionsAnalysisPanel({
             </div>
             <div className="mt-2 max-w-2xl text-sm text-zinc-400">
               A sharper view of how you solve: difficulty conversion, language
-              preferences, top strengths, and topic coverage.
+              preferences, streaks, pacing, top strengths, and topic coverage.
             </div>
           </div>
 
-          {data && "success" in data && data.success === true && data.stats && (
-            <div className="flex flex-wrap gap-2">
-              {typeof data.stats.uniqueAcceptedProblemsCount === "number" && (
+          <div className="flex flex-wrap gap-2">
+            {data && data.success === true && data.stats && (
+              <>
+                {typeof data.stats.uniqueAcceptedProblemsCount === "number" && (
+                  <StatPill
+                    label="Unique solved"
+                    value={data.stats.uniqueAcceptedProblemsCount}
+                  />
+                )}
+                {typeof data.stats.acceptedSubmissionsCount === "number" && (
+                  <StatPill
+                    label="Accepted submissions"
+                    value={data.stats.acceptedSubmissionsCount}
+                  />
+                )}
+                {typeof data.stats.tagCount === "number" && (
+                  <StatPill label="Tags" value={data.stats.tagCount} />
+                )}
+              </>
+            )}
+
+            {trackerOk &&
+              typeof trackerData.total_submissions === "number" && (
                 <StatPill
-                  label="Unique solved"
-                  value={data.stats.uniqueAcceptedProblemsCount}
+                  label="Tracked submissions"
+                  value={trackerData.total_submissions}
                 />
               )}
-              {typeof data.stats.acceptedSubmissionsCount === "number" && (
+
+            {trackerOk &&
+              typeof trackerData.current_streak === "number" && (
                 <StatPill
-                  label="Accepted submissions"
-                  value={data.stats.acceptedSubmissionsCount}
+                  label="Current streak"
+                  value={`${trackerData.current_streak} day${
+                    trackerData.current_streak === 1 ? "" : "s"
+                  }`}
                 />
               )}
-              {typeof data.stats.tagCount === "number" && (
-                <StatPill label="Tags" value={data.stats.tagCount} />
-              )}
-            </div>
-          )}
+          </div>
         </div>
       </div>
 
@@ -653,7 +937,7 @@ export function SubmissionsAnalysisPanel({
         <div className="rounded-3xl border border-white/10 bg-[linear-gradient(180deg,rgba(36,36,36,0.96),rgba(24,24,27,0.96))] p-6 text-sm text-zinc-300">
           No data yet.
         </div>
-      ) : "success" in data && data.success === false ? (
+      ) : data.success === false ? (
         <div className="rounded-3xl border border-red-500/20 bg-[linear-gradient(180deg,rgba(36,36,36,0.96),rgba(24,24,27,0.96))] p-6 text-sm text-red-400">
           {data.message ?? "Failed to load."}
         </div>
@@ -663,6 +947,8 @@ export function SubmissionsAnalysisPanel({
         </div>
       ) : (
         <>
+          <SubmissionTrackerCard tracker={trackerData} />
+
           <div className="grid grid-cols-1 gap-5 xl:grid-cols-12">
             <div className="xl:col-span-7">
               <SectionCard
