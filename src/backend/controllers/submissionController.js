@@ -172,10 +172,8 @@ export const syncSubmissions = async (req,res) => {
 
 export const submissionTracker = async(req,res) => {
     try {
-        // const userId = req.session?.userId;
-        // if (!userId) return res.status(401).json({ success:false, message: "Please log in" });
-        const userId = new mongoose.Types.ObjectId("69a762966d5221b434ea5b1d");
-        const leetcodeUsername = 'n3m0lives';
+        const userId = req.session?.userId;
+        if (!userId) return res.status(401).json({ success:false, message: "Please log in" });;
         
         const allDailyActivity = await lc_daily_activity.find({ userId: userId }).sort({ date: 1}).lean();
 
@@ -190,7 +188,7 @@ export const submissionTracker = async(req,res) => {
             });
         }
 
-        let totalSubmissions = 0;
+        let total_submissions = 0;
         const activeDays = allDailyActivity.length;
 
         let longest_streak = 1;
@@ -200,7 +198,7 @@ export const submissionTracker = async(req,res) => {
 
         for (let i = 0; i < allDailyActivity.length; i++) {
             const activity = allDailyActivity[i];
-            totalSubmissions += activity.submissions;
+            total_submissions += activity.submissions;
 
             if (activity.submissions > most_active_day.submissions)  {
                 most_active_day = activity;
@@ -237,15 +235,16 @@ export const submissionTracker = async(req,res) => {
             }
         }
 
-        const avg_submissions_per_day = totalSubmissions / activeDays;
+        const avg_submissions_per_day = total_submissions / activeDays;
 
         return res.status(200).json({
             success: true,
+            total_submissions,
             avg_submissions_per_day,
             longest_streak,
             current_streak,
             most_active_day
-        })
+        });
 
     } catch (error) {
         console.log(error);
