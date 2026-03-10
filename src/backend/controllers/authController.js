@@ -99,6 +99,7 @@ export const githubOAuthCallback = async (req, res) => {
         const userGithubData = await axios.get(`https://api.github.com/user`, config);
         const githubUsername = userGithubData.data.login;
         const githubUrl = userGithubData.data.html_url;
+        const githubID = userGithubData.data.id
         // console.log(userGithubData);
 
         if (!githubID) {
@@ -109,6 +110,7 @@ export const githubOAuthCallback = async (req, res) => {
         const user = await User.findOneAndUpdate( 
             { githubID },
             {
+                githubID,
                 githubUsername,
                 githubUrl
             },
