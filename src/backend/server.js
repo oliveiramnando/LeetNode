@@ -9,6 +9,8 @@ import authRoutes from "./routes/authRoutes.js";
 import leetcodeRoutes from "./routes/leetcodeRoute.js";
 import friendRoutes from "./routes/friendRoutes.js";
 import submissionRoutes from "./routes/submissionRoutes.js";
+import tagRoutes from "./routes/tagRoutes.js";
+import feedRoutes from "./routes/feedRoutes.js";
 
 const PORT = process.env.PORT || 8080;
 const app = express();
@@ -26,6 +28,8 @@ app.use("/api/auth", authRoutes);
 app.use("/api/leetcode", leetcodeRoutes);
 app.use("/api/friend", friendRoutes);
 app.use("/api/submissions", submissionRoutes);
+app.use("/api/tags", tagRoutes);
+app.use("/api/feed", feedRoutes);
 
 console.log("2. middleware and routes registered");
 console.log("3. about to call connectDB()");
