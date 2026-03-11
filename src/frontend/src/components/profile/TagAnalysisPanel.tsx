@@ -1,5 +1,5 @@
 // src/frontend/src/components/profile/TagAnalysisPanel.tsx
-"use client"; 
+"use client";
 
 import React from "react";
 import { useAuth } from "@/components/auth/AuthProvider";
@@ -33,10 +33,23 @@ type TagStrengthsResponse =
 
 type WeakTag = {
   tag: string;
-  attemptedProblems: number;
-  acceptedProblems: number;
-  failedProblems: number;
+  attemptedProblems?: number;
+  acceptedProblems?: number;
+  failedProblems?: number;
+  attemptedSubmissions?: number;
+  acceptedSubmissions?: number;
+  failedSubmissions?: number;
   acceptanceRate: number;
+};
+
+type Recommendation = {
+  title: string;
+  titleSlug: string;
+  difficulty?: string;
+  weakTagMatches?: number;
+  matchedWeakTags?: string[];
+  libraryUrl?: string | null;
+  url?: string;
 };
 
 type TagWeaknessesResponse =
@@ -45,6 +58,7 @@ type TagWeaknessesResponse =
       success: true;
       weakestTags?: WeakTag[];
       tagStats?: WeakTag[];
+      recommendations?: Recommendation[];
     };
 
 const TOPICS = [
@@ -315,6 +329,11 @@ export function TagAnalysisPanel({
       ? weaknessesData.weakestTags ?? []
       : [];
 
+  const recommendations =
+    weaknessesData && weaknessesData.success === true
+      ? weaknessesData.recommendations ?? []
+      : [];
+
   const maxBars = Math.max(1, ...tags.map((t) => t.acceptedCount));
   const topicData = buildTopicDistribution(tagMap);
   const topicMax = Math.max(1, ...topicData.map((d) => d.count));
@@ -399,44 +418,125 @@ export function TagAnalysisPanel({
                 No weakest-tag data yet.
               </div>
             ) : (
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-                {weakestTags.map((tag) => (
-                  <div
-                    key={tag.tag}
-                    className="rounded-2xl border border-white/10 bg-white/[0.03] p-4"
-                  >
-                    <div className="text-base font-semibold text-white">
-                      {tag.tag}
-                    </div>
+              <div className="space-y-5">
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                  {weakestTags.map((tag) => {
+                    const failed =
+                      tag.failedSubmissions ?? tag.failedProblems ?? 0;
+                    const attempted =
+                      tag.attemptedSubmissions ?? tag.attemptedProblems ?? 0;
+                    const accepted =
+                      tag.acceptedSubmissions ?? tag.acceptedProblems ?? 0;
 
-                    <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
-                      <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
-                        <div className="text-zinc-500">Acceptance</div>
-                        <div className="mt-1 font-medium text-rose-400">
-                          {pct(tag.acceptanceRate)}
+                    return (
+                      <div
+                        key={tag.tag}
+                        className="rounded-2xl border border-white/10 bg-white/[0.03] p-4"
+                      >
+                        <div className="text-base font-semibold text-white">
+                          {tag.tag}
+                        </div>
+
+                        <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
+                          <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
+                            <div className="text-zinc-500">Acceptance</div>
+                            <div className="mt-1 font-medium text-rose-400">
+                              {pct(tag.acceptanceRate)}
+                            </div>
+                          </div>
+                          <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
+                            <div className="text-zinc-500">Failed</div>
+                            <div className="mt-1 font-medium text-white">
+                              {failed}
+                            </div>
+                          </div>
+                          <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
+                            <div className="text-zinc-500">Attempted</div>
+                            <div className="mt-1 font-medium text-white">
+                              {attempted}
+                            </div>
+                          </div>
+                          <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
+                            <div className="text-zinc-500">Accepted</div>
+                            <div className="mt-1 font-medium text-emerald-400">
+                              {accepted}
+                            </div>
+                          </div>
                         </div>
                       </div>
-                      <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
-                        <div className="text-zinc-500">Failed</div>
-                        <div className="mt-1 font-medium text-white">
-                          {tag.failedProblems}
-                        </div>
+                    );
+                  })}
+                </div>
+
+                <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-4">
+                  <div className="mb-3 flex items-start justify-between gap-3">
+                    <div>
+                      <div className="text-base font-semibold text-white">
+                        Recommended Problems
                       </div>
-                      <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
-                        <div className="text-zinc-500">Attempted</div>
-                        <div className="mt-1 font-medium text-white">
-                          {tag.attemptedProblems}
-                        </div>
+                      <div className="mt-1 text-sm text-zinc-400">
+                        Medium problems selected from your weakest areas.
                       </div>
-                      <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
-                        <div className="text-zinc-500">Accepted</div>
-                        <div className="mt-1 font-medium text-emerald-400">
-                          {tag.acceptedProblems}
-                        </div>
-                      </div>
+                    </div>
+                    <div className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-xs text-zinc-400">
+                      {recommendations.length} shown
                     </div>
                   </div>
-                ))}
+
+                  {recommendations.length === 0 ? (
+                    <div className="text-sm text-zinc-400">
+                      No recommendations available yet.
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {recommendations.map((rec) => (
+                        <a
+                          key={rec.titleSlug}
+                          href={
+                            rec.url ||
+                            (rec.libraryUrl
+                              ? `https://leetcode.com${rec.libraryUrl}`
+                              : `https://leetcode.com/problems/${rec.titleSlug}/`)
+                          }
+                          target="_blank"
+                          rel="noreferrer"
+                          className="block rounded-2xl border border-white/10 bg-white/[0.03] p-4 transition hover:border-orange-400/30 hover:bg-white/[0.05]"
+                        >
+                          <div className="flex items-center justify-between gap-4">
+                            <div className="min-w-0">
+                              <div className="truncate text-sm font-semibold text-white sm:text-base">
+                                {rec.title}
+                              </div>
+
+                              <div className="mt-2 flex flex-wrap items-center gap-2">
+                                {rec.difficulty ? (
+                                  <span className="rounded-full border border-orange-400/20 bg-orange-500/10 px-2.5 py-1 text-xs font-medium text-orange-300">
+                                    {rec.difficulty}
+                                  </span>
+                                ) : null}
+
+                                {rec.matchedWeakTags && rec.matchedWeakTags.length > 0
+                                  ? rec.matchedWeakTags.map((tag) => (
+                                      <span
+                                        key={`${rec.titleSlug}-${tag}`}
+                                        className="rounded-full border border-rose-400/20 bg-rose-500/10 px-2.5 py-1 text-xs text-rose-300"
+                                      >
+                                        {tag}
+                                      </span>
+                                    ))
+                                  : null}
+                              </div>
+                            </div>
+
+                            <div className="shrink-0 text-sm font-medium text-orange-300">
+                              Open problem →
+                            </div>
+                          </div>
+                        </a>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
             )}
           </SectionCard>
