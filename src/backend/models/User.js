@@ -29,4 +29,8 @@ UserSchema.index(
     { unique: true, sparse: true }
 );
 
+UserSchema.index(
+    { leetcodeUsername: 1 },
+);
+
 export default mongoose.models.User || mongoose.model('User', UserSchema);
