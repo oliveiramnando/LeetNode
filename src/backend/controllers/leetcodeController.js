@@ -1,5 +1,6 @@
 import { LeetCode } from "leetcode-query";
 import User from "../models/User.js";
+import { syncSubmissionsIfNeeded } from "../utils/syncSubmissions.js";
 
 
 function normalizeGithubUrl(url) {
@@ -32,7 +33,19 @@ function normalizeGithubUrl(url) {
 
 export const getUser = async (req,res) => {
     try {
+        console.log("EXPRESS raw cookie:", req.headers.cookie);
+        console.log("EXPRESS session:", req.session);
+
         const { username } = req.params;
+        const userId = req.session?.userId;
+        const leetcodeUsername = req.session?.leetcodeUsername;
+
+        console.log({ userId, leetcodeUsername });
+
+        if (userId && leetcodeUsername && leetcodeUsername === String(username).toLowerCase()) {
+            const syncResult = await syncSubmissionsIfNeeded(userId, leetcodeUsername);
+            console.log(syncResult);
+        }
 
         const leetcode = new LeetCode();
         const user = await leetcode.user(username);
