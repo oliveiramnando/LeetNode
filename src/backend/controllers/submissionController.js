@@ -68,7 +68,7 @@ export const syncSubmissions = async (req,res) => {
                         submissions: 1,
                         acceptedSubmissions: accepted ? 1 : 0,
                         acceptedEasy: (difficulty === "Easy") && accepted ? 1 : 0,
-                        acceptedMedium:(difficulty) && accepted ? 1 : 0,
+                        acceptedMedium:(difficulty === "Medium") && accepted ? 1 : 0,
                         acceptedHard: (difficulty === "Hard") && accepted ? 1 : 0,
                     }
                 },
