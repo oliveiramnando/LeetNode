@@ -1,22 +1,20 @@
-// src/backend/utils/fillLcProblems.js
-import { LeetCode } from "leetcode-query";
 import lc_problems from "../models/submissions/lc_problems.js";
 
-async function fillLcProblems(leetcode, submission) {
-    const existingProblem = await lc_problems.findOne({ titleSlug: submission.titleSlug });
+async function fillLcProblems(leetcode, problem) {
+    const existingProblem = await lc_problems.findOne({ titleSlug: problem.titleSlug });
     if (existingProblem) {
         return {
-            success: true,
+            success: false,
             difficulty: existingProblem.difficulty
         };
     }
-    const { difficulty, topicTags } = await leetcode.problem(submission.titleSlug);
+    const { difficulty, topicTags } = await leetcode.problem(problem.titleSlug);
     await lc_problems.findOneAndUpdate(
-        { titleSlug: submission.titleSlug },
+        { titleSlug: problem.titleSlug },
         {
             $setOnInsert: {
-                titleSlug: submission.titleSlug,
-                title: submission.title,
+                titleSlug: problem.titleSlug,
+                title: problem.title,
                 difficulty,
                 topicTags,
             }
@@ -24,6 +22,7 @@ async function fillLcProblems(leetcode, submission) {
         { upsert: true, returnDocument: 'after' }
     );
     return {
+        success: true,
         difficulty
     }
 }
