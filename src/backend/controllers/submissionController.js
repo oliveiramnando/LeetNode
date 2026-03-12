@@ -4,6 +4,7 @@ import lc_submission_events from "../models/submissions/lc_submission_events.js"
 import lc_daily_activity from "../models/submissions/lc_daily_activity.js";
 import lc_sync_state from "../models/submissions/lc_sync_state.js";
 import lc_stats_snapshot from "../models/submissions/lc_stats_snapshot.js";
+import { fillLcProblems } from "../utils/fillLcProblems.js";
 import mongoose from "mongoose";
 
 export const syncSubmissions = async (req,res) => {
@@ -13,7 +14,6 @@ export const syncSubmissions = async (req,res) => {
 
         if (!userId) return res.status(401).json({ success: false, message: "Please Log In"});
         if (!leetcodeUsername) return res.status(401).json({ success: false, message: "Please Link your account"});
-
 
         const leetcode = new LeetCode();
         const recentSubmissions = await leetcode.recent_submissions(leetcodeUsername);
@@ -32,26 +32,7 @@ export const syncSubmissions = async (req,res) => {
         }
 
         for (const submission of recentSubmissions) {
-            let diff;
-            const existingProblem = await lc_problems.findOne({ titleSlug: submission.titleSlug }).lean();
-            if (!existingProblem){ 
-                const { difficulty, topicTags } = await leetcode.problem(submission.titleSlug);
-                diff = difficulty
-                await lc_problems.findOneAndUpdate(
-                    { titleSlug: submission.titleSlug },
-                    {
-                        $setOnInsert: {
-                            titleSlug: submission.titleSlug,
-                            title: submission.title,
-                            difficulty,
-                            topicTags,
-                        }
-                    },
-                    { upsert: true, returnDocument: 'after' }
-                );
-            } else {
-                diff = existingProblem?.difficulty;
-            }
+            const { difficulty } = await fillLcProblems(leetcode, submission); // fills lc_db problem
 
             const ts = Number(submission.timestamp);
             const submissionDate = new Date(ts * 1000);
@@ -86,9 +67,9 @@ export const syncSubmissions = async (req,res) => {
                     $inc: {
                         submissions: 1,
                         acceptedSubmissions: accepted ? 1 : 0,
-                        acceptedEasy: (diff === "Easy") && accepted ? 1 : 0,
-                        acceptedMedium:(diff === "Medium") && accepted ? 1 : 0,
-                        acceptedHard: (diff === "Hard") && accepted ? 1 : 0,
+                        acceptedEasy: (difficulty === "Easy") && accepted ? 1 : 0,
+                        acceptedMedium:(difficulty) && accepted ? 1 : 0,
+                        acceptedHard: (difficulty === "Hard") && accepted ? 1 : 0,
                     }
                 },
                 { upsert: true, returnDocument: 'after' }
