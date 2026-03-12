@@ -1,5 +1,6 @@
 import lc_problems from "../models/submissions/lc_problems.js";
 import lc_submission_events from "../models/submissions/lc_submission_events.js";
+import { fillLcProblems } from "../utils/fillLcProblems.js";
 import { LeetCode } from "leetcode-query";
 import mongoose from "mongoose";
 
@@ -62,15 +63,13 @@ export const tagStrengths = async (req, res) => {
 
 export const tagWeaknesses = async (req, res) => {
     try {
-        // const userId = req.session?.userId;
-        // const leetcodeUsername = req.session?.leetcodeUsername;
+        const userId = req.session?.userId;
+        const leetcodeUsername = req.session?.leetcodeUsername;
 
-        // if (!userId) return res.status(401).json({ success: false, message: "log in" });
-        // if (!leetcodeUsername) return res.status(400).json({ success: false, message: "link your leetcode account" });
+        if (!userId) return res.status(401).json({ success: false, message: "log in" });
+        if (!leetcodeUsername) return res.status(400).json({ success: false, message: "link your leetcode account" });
 
-        const userId = new mongoose.Types.ObjectId("69a762966d5221b434ea5b1d");
-        const leetcodeUsername = "n3m0lives";
-
+        // ------ calculates weak tags from submission events ------ //
         const submissions = await lc_submission_events.find(
             { userId },
             { titleSlug: 1, status: 1 }
@@ -174,11 +173,28 @@ export const tagWeaknesses = async (req, res) => {
             });
 
         const weakestTags = tagStats.slice(0, 3);
-
+        
+        // ------ recommendations based on weak tags ------ //
         const leetcode = new LeetCode();
 
         const weaknessResults = await Promise.all(
             weakestTags.map(async (weakness) => {
+                const dbProblems = await lc_problems.find( // revist randomness later on when cache grows
+                    { 
+                        difficulty: "Medium",
+                        "topicTags.name": weakness.tag 
+                    },
+                ).lean();
+
+                console.log("DB problems for", weakness.tag, dbProblems.length);
+                
+                if (dbProblems.length >= 20) {
+                    return {
+                        tag: weakness.tag,
+                        questions: Array.isArray(dbProblems) ? dbProblems : []
+                    };
+                }
+
                 const result = await leetcode.problems({
                     filters: {
                         difficulty: "MEDIUM",
@@ -186,6 +202,11 @@ export const tagWeaknesses = async (req, res) => {
                     },
                     limit: 20,
                 });
+
+                for (const problem of (Array.isArray(result?.questions) ? result.questions : [])) {
+                    await fillLcProblems(leetcode, problem);
+                } 
+                console.log("done filling db");
 
                 return {
                     tag: weakness.tag,
