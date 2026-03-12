@@ -17,12 +17,11 @@ const lc_problemsSchema = new mongoose.Schema({
         type: String,
         required: true,
         enum: ["Easy", "Medium", "Hard"],
-        index: true
     },
-    topicTags: {
+    topicTags: [{
         name: { type: String, required: true, trim: true },
         slug: { type: String, required: true, trim: true },
-    },
+    }],
     fetchedAt: {
         type: Date,
         default: () => new Date(),
@@ -35,6 +34,11 @@ const lc_problemsSchema = new mongoose.Schema({
 });
 
 lc_problemsSchema.index({ "topicTags.slug": 1 });
+lc_problemsSchema.index({ difficulty: 1 });
+lc_problemsSchema.index({
+    difficulty: 1,
+    "topicTags.slug": 1
+});
 
 export default mongoose.model(
     "lc_problems",
