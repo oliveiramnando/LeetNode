@@ -4,6 +4,7 @@ import { fillLcProblems } from "../utils/fillLcProblems.js";
 import { LeetCode } from "leetcode-query";
 import mongoose from "mongoose";
 
+const inFlightTagFills = new Set();
 
 export const tagStrengths = async (req, res) => {
     try {
@@ -69,7 +70,6 @@ export const tagWeaknesses = async (req, res) => {
         if (!userId) return res.status(401).json({ success: false, message: "log in" });
         if (!leetcodeUsername) return res.status(400).json({ success: false, message: "link your leetcode account" });
 
-        // ------ calculates weak tags from submission events ------ //
         const submissions = await lc_submission_events.find(
             { userId },
             { titleSlug: 1, status: 1 }
@@ -173,50 +173,75 @@ export const tagWeaknesses = async (req, res) => {
             });
 
         const weakestTags = tagStats.slice(0, 3);
-        
-        // ------ recommendations based on weak tags ------ //
         const leetcode = new LeetCode();
 
         const weaknessResults = await Promise.all(
             weakestTags.map(async (weakness) => {
-                const dbProblems = await lc_problems.find( // revist randomness later on when cache grows
-                    { 
+                const tagName = weakness.tag;
+                let dbProblems = await lc_problems.find(
+                    {
                         difficulty: "Medium",
-                        "topicTags.name": weakness.tag 
-                    },
+                        "topicTags.name": tagName,
+                    }
                 ).lean();
 
-                console.log("DB problems for", weakness.tag, dbProblems.length);
-                
+                console.log("DB problems for", tagName, dbProblems.length);
                 if (dbProblems.length >= 20) {
                     return {
-                        tag: weakness.tag,
-                        questions: Array.isArray(dbProblems) ? dbProblems : []
+                        tag: tagName,
+                        questions: dbProblems,
                     };
                 }
 
-                const result = await leetcode.problems({
-                    filters: {
-                        difficulty: "MEDIUM",
-                        tags: [weakness.tag],
-                    },
-                    limit: 20,
-                });
+                if (inFlightTagFills.has(tagName)) {
+                    console.log("fill already in progress for", tagName);
 
-                for (const problem of (Array.isArray(result?.questions) ? result.questions : [])) {
-                    await fillLcProblems(leetcode, problem);
-                } 
-                console.log("done filling db");
+                    return {
+                        tag: tagName,
+                        questions: dbProblems,
+                    };
+                }
 
-                return {
-                    tag: weakness.tag,
-                    questions: Array.isArray(result?.questions) ? result.questions : [],
-                };
+                inFlightTagFills.add(tagName);
+
+                try {
+                    const result = await leetcode.problems({
+                        filters: {
+                            difficulty: "MEDIUM",
+                            tags: [tagName],
+                        },
+                        limit: 20,
+                    });
+
+                    const fetchedQuestions = Array.isArray(result?.questions)
+                        ? result.questions
+                        : [];
+
+                    for (const problem of fetchedQuestions) {
+                        await fillLcProblems(leetcode, problem);
+                    }
+
+                    console.log("done filling db for", tagName);
+
+                    dbProblems = await lc_problems.find(
+                        {
+                            difficulty: "Medium",
+                            "topicTags.name": tagName,
+                        }
+                    ).lean();
+
+                    return {
+                        tag: tagName,
+                        questions: dbProblems.length > 0 ? dbProblems : fetchedQuestions,
+                    };
+                } finally {
+                    inFlightTagFills.delete(tagName);
+                }
             })
         );
 
         const weakTagSet = new Set(weakestTags.map((t) => t.tag));
-
+        
         const uniqueProblems = new Map();
 
         for (const entry of weaknessResults) {
