@@ -12,18 +12,40 @@ export const submissionFeed = async (req,res) => {
         const followingsLeetcodeUsername = await Friend.find({ leetnodeUser: userId }, { leetcodeUsername: 1 }).lean();
 
         const followings = [...new Set(
-            followingsLeetcodeUsername.map((friend) => friend.leetcodeUsername)
+            followingsLeetcodeUsername.map((friend) => friend.leetcodeUsername?.trim().toLowerCase()).filter(Boolean)
         )];
+
+        if (followings.length === 0) {
+            return res.status(200).json({
+                success: true,
+                submissions: [],
+            });
+        }
     
-        const usersCurrentFollows = await User.find( // if empty then the user doesn't have a leetcode account
+        const userFollowings = await User.find( // if empty then the user doesn't have a leetcode account
             { leetcodeUsername: { $in: followings } },
             { _id: 1, leetcodeUsername: 1 }
         ).lean();
+
+        const followingUserIds = [...new Set(
+            userFollowings.map((id) => id._id)
+        )];
         
+        if (followingUserIds.length === 0) {
+            return res.status(200).json({
+                success: true,
+                submissions: [],
+            });
+        }
+        // get last 20 submissions from each user, store them in one array arrange in chronological descending order, display them
+        const submissions = await lc_submission_events.find(
+            { userId: { $in: followingUserIds } },
+        ).sort({ timeStamp: -1}).limit(20).populate("userId").lean();
         
 
         return res.status(200).json({
             success: true,
+            submissions
         });
 
     } catch (error) {
