@@ -42,6 +42,10 @@ lc_submission_eventsSchema.index({
     userId: 1, status: 1, titleSlug: 1 
 });
 
+lc_submission_eventsSchema.index(
+    { userId: 1, timeStamp: -1 },
+    { unique: true}
+)
 
 export default mongoose.model(
     "lc_submission_events",
