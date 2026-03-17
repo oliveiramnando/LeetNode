@@ -1,3 +1,4 @@
+// src/frontend/src/components/Navbar.jsx
 "use client";
 
 import Link from "next/link";
@@ -22,7 +23,7 @@ export default function Navbar() {
         cache: "no-store",
       });
     } finally {
-      signOutLocal(); // immediate UI update
+      signOutLocal();
       router.push("/");
       router.refresh();
     }
@@ -52,8 +53,15 @@ export default function Navbar() {
             </>
           ) : (
             <>
+              <Link href="/feed" className="hover:text-white transition-colors">
+                feed
+              </Link>
               <span className="text-zinc-400">{user?.leetcodeUsername}</span>
-              <button type="button" onClick={handleLogout} className="hover:text-white transition-colors">
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="hover:text-white transition-colors"
+              >
                 logout
               </button>
               <ProfileButton />
