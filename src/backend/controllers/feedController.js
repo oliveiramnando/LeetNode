@@ -1,13 +1,13 @@
 import User from  "../models/User.js";
 import Friend from "../models/Friend.js";
 import lc_submission_events from "../models/submissions/lc_submission_events.js";
+import Comment from "../models/SubmissionComments.js";
 import mongoose from "mongoose";
 
 export const submissionFeed = async (req,res) => {
     try {
-        // const currentUserId = req.session?.userId;
-        // if (!currentUserId) return res.status(401).json({ success: false, message: "Please log in to view following" });
-        const userId = new mongoose.Types.ObjectId("69a762966d5221b434ea5b1d");
+        const currentUserId = req.session?.userId;
+        if (!currentUserId) return res.status(401).json({ success: false, message: "Please log in to view following" });
 
         const followingsLeetcodeUsername = await Friend.find({ leetnodeUser: userId }, { leetcodeUsername: 1 }).lean();
 
@@ -48,6 +48,35 @@ export const submissionFeed = async (req,res) => {
             submissions
         });
 
+    } catch (error) {
+        console.log(error);
+        return res.status(500).json({
+            success: false,
+            message: error.message
+        });
+    }
+}
+
+export const submissionComment = async (req,res) => {
+    try {
+        const { submissionId } = req.params;
+        const { userComment } = req.body;
+        const userId = req.session?.userId;
+        const leetcodeUsername = req.session?.leetcodeUsername;
+
+        const comment = new Comment({
+            author: userId,
+            authorUsername: leetcodeUsername,
+            submissionId,
+            body: userComment
+        });
+
+        await comment.save();
+
+        return res.status(200).json({
+            success: true,
+            comment
+        })
     } catch (error) {
         console.log(error);
         return res.status(500).json({
