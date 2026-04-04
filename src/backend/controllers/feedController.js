@@ -23,7 +23,7 @@ export const submissionFeed = async (req,res) => {
         }
     
         const userFollowings = await User.find( // if empty then the user doesn't have a leetcode account
-            { leetcodeUsername: { $in: followings } },
+            { leetcodeUsernameLower: { $in: followings } },
             { _id: 1, leetcodeUsername: 1 }
         ).lean();
 
@@ -38,9 +38,53 @@ export const submissionFeed = async (req,res) => {
             });
         }
         // get last 20 submissions from each user, store them in one array arrange in chronological descending order, display them
-        const submissions = await lc_submission_events.find(
-            { userId: { $in: followingUserIds } },
-        ).sort({ timeStamp: -1}).limit(20).populate("userId").lean();
+        // const submissions = await lc_submission_events.find(
+        //     { userId: { $in: followingUserIds } },
+        // ).sort({ timeStamp: -1}).limit(20).populate("userId").lean();
+        const submissions = await lc_submission_events.aggregate([
+            {
+                $match: {
+                userId: { $in: followingUserIds },
+                },
+            },
+            {
+                $sort: { timeStamp: -1 },
+            },
+            {
+                $limit: 20,
+            },
+            {
+                $lookup: {
+                from: "comments",
+                localField: "_id",
+                foreignField: "submissionId",
+                as: "comments",
+                },
+            },
+            {
+                $addFields: {
+                commentCount: { $size: "$comments" },
+                },
+            },
+            {
+                $lookup: {
+                from: "users",
+                localField: "userId",
+                foreignField: "_id",
+                as: "userId",
+                },
+            },
+            {
+                $unwind: "$userId",
+            },
+            {
+                $project: {
+                comments: 0,
+                "userId.password": 0,
+                "userId.__v": 0,
+                },
+            },
+            ]);
         
 
         return res.status(200).json({
