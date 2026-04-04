@@ -9,7 +9,7 @@ export const submissionFeed = async (req,res) => {
         const currentUserId = req.session?.userId;
         if (!currentUserId) return res.status(401).json({ success: false, message: "Please log in to view following" });
 
-        const followingsLeetcodeUsername = await Friend.find({ leetnodeUser: userId }, { leetcodeUsername: 1 }).lean();
+        const followingsLeetcodeUsername = await Friend.find({ leetnodeUser: currentUserId }, { leetcodeUsername: 1 }).lean();
 
         const followings = [...new Set(
             followingsLeetcodeUsername.map((friend) => friend.leetcodeUsername?.trim().toLowerCase()).filter(Boolean)
@@ -55,11 +55,33 @@ export const submissionFeed = async (req,res) => {
             message: error.message
         });
     }
-}
+};
 
-export const submissionComment = async (req,res) => {
+export const getSubmissionComments = async (req,res) => {
     try {
         const { submissionId } = req.params;
+        const userId = req.session?.userId;
+        const leetcodeUsername = req.session?.leetcodeUsername;
+
+        const submissionComments = await Comment.find({ submissionId: submissionId }).lean();
+
+        return res.status(200).json({
+            success: true,
+            submissionComments
+        })
+    } catch (error) {
+        console.log(error);
+        return res.status(500).json({
+            success: false,
+            message: error.message
+        })
+    }
+};
+
+
+export const postSubmissionComment = async (req,res) => {
+    try {
+        const { submissionId } = req.params; // id over submission slug
         const { userComment } = req.body;
         const userId = req.session?.userId;
         const leetcodeUsername = req.session?.leetcodeUsername;
@@ -84,4 +106,4 @@ export const submissionComment = async (req,res) => {
             message: error.message
         })
     }
-}
+};
