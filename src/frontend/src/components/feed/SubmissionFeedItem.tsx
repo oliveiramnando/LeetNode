@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { useState } from "react";
 
 type FeedUser = {
   _id: string;
@@ -15,7 +16,38 @@ type FeedSubmission = {
   timeStamp: number;
   status: string;
   lang: string;
+  commentCount?: number;
 };
+
+type FeedComment = {
+  _id: string;
+  author: string;
+  authorUsername: string;
+  submissionId: string;
+  body: string;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+type CommentsResponse =
+  | {
+      success: true;
+      submissionComments: FeedComment[];
+    }
+  | {
+      success: false;
+      message?: string;
+    };
+
+type PostCommentResponse =
+  | {
+      success: true;
+      comment: FeedComment;
+    }
+  | {
+      success: false;
+      message?: string;
+    };
 
 function formatRelativeTime(unixSeconds?: number) {
   if (!unixSeconds || Number.isNaN(unixSeconds)) return "unknown time";
@@ -39,6 +71,27 @@ function formatRelativeTime(unixSeconds?: number) {
   if (diffMs < week) return `${Math.floor(diffMs / day)}d ago`;
 
   return new Date(then).toLocaleDateString();
+}
+
+function formatCommentTime(dateString?: string) {
+  if (!dateString) return "";
+
+  const then = new Date(dateString).getTime();
+  if (Number.isNaN(then)) return "";
+
+  const diffMs = Date.now() - then;
+
+  const minute = 60 * 1000;
+  const hour = 60 * minute;
+  const day = 24 * hour;
+  const week = 7 * day;
+
+  if (diffMs < minute) return "now";
+  if (diffMs < hour) return `${Math.floor(diffMs / minute)}m`;
+  if (diffMs < day) return `${Math.floor(diffMs / hour)}h`;
+  if (diffMs < week) return `${Math.floor(diffMs / day)}d`;
+
+  return new Date(dateString).toLocaleDateString();
 }
 
 function prettifyLang(lang?: string) {
@@ -86,6 +139,19 @@ export default function SubmissionFeedItem({
 }: {
   submission: FeedSubmission;
 }) {
+  const backend = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8080";
+
+  const [showComments, setShowComments] = useState(false);
+  const [comments, setComments] = useState<FeedComment[]>([]);
+  const [loadingComments, setLoadingComments] = useState(false);
+  const [commentsLoaded, setCommentsLoaded] = useState(false);
+  const [commentsError, setCommentsError] = useState("");
+  const [newComment, setNewComment] = useState("");
+  const [postingComment, setPostingComment] = useState(false);
+  const [localCommentCount, setLocalCommentCount] = useState(
+    submission.commentCount ?? 0
+  );
+
   const username =
     submission.userId?.leetcodeUsername ||
     submission.userId?.leetcodeUsernameLower ||
@@ -93,6 +159,95 @@ export default function SubmissionFeedItem({
 
   const profileHref = `/profile/${encodeURIComponent(username)}`;
   const problemHref = `https://leetcode.com/problems/${submission.titleSlug}/`;
+
+  async function fetchComments() {
+    try {
+      setLoadingComments(true);
+      setCommentsError("");
+
+      const res = await fetch(`${backend}/api/feed/submissions/${submission._id}/comments`, {
+        method: "GET",
+        credentials: "include",
+        headers: { Accept: "application/json" },
+        cache: "no-store",
+      });
+
+      const data: CommentsResponse = await res.json().catch(() => ({
+        success: false,
+        message: "Invalid response from server",
+      }));
+
+      if (!res.ok || !data.success) {
+        throw new Error(
+          "message" in data && data.message
+            ? data.message
+            : "Failed to load comments"
+        );
+      }
+
+      setComments(
+        Array.isArray(data.submissionComments) ? data.submissionComments : []
+      );
+      setCommentsLoaded(true);
+    } catch (err: any) {
+      setCommentsError(err?.message || "Failed to load comments");
+    } finally {
+      setLoadingComments(false);
+    }
+  }
+
+  async function toggleComments() {
+    const opening = !showComments;
+
+    if (opening && !commentsLoaded) {
+      await fetchComments();
+    }
+
+    setShowComments(opening);
+  }
+
+  async function handlePostComment() {
+    const trimmed = newComment.trim();
+    if (!trimmed || postingComment) return;
+
+    try {
+      setPostingComment(true);
+      setCommentsError("");
+
+      const res = await fetch(`${backend}/api/feed/submissions/${submission._id}/comments`, {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ userComment: trimmed }),
+      });
+
+      const data: PostCommentResponse = await res.json().catch(() => ({
+        success: false,
+        message: "Invalid response from server",
+      }));
+
+      if (!res.ok || !data.success) {
+        throw new Error(
+          "message" in data && data.message
+            ? data.message
+            : "Failed to post comment"
+        );
+      }
+
+      setComments((prev) => [data.comment, ...prev]);
+      setLocalCommentCount((prev) => prev + 1);
+      setNewComment("");
+      setShowComments(true);
+      setCommentsLoaded(true);
+    } catch (err: any) {
+      setCommentsError(err?.message || "Failed to post comment");
+    } finally {
+      setPostingComment(false);
+    }
+  }
 
   return (
     <article className="rounded-2xl border border-white/10 bg-white/5 p-5 transition-colors hover:border-white/15 hover:bg-white/[0.06]">
@@ -141,6 +296,74 @@ export default function SubmissionFeedItem({
           </span>
         )}
       </div>
+
+      <div className="mt-4 flex items-center gap-4 text-sm">
+        <button
+          type="button"
+          onClick={toggleComments}
+          className="text-zinc-400 transition hover:text-white"
+        >
+          {showComments
+            ? "Hide comments"
+            : localCommentCount === 1
+            ? "View 1 comment"
+            : `View all ${localCommentCount} comments`}
+        </button>
+      </div>
+
+      {showComments && (
+        <div className="mt-4 border-t border-white/10 pt-4">
+          <div className="space-y-3">
+            {loadingComments ? (
+              <p className="text-sm text-zinc-500">Loading comments...</p>
+            ) : commentsError ? (
+              <p className="text-sm text-red-300">{commentsError}</p>
+            ) : comments.length === 0 ? (
+              <p className="text-sm text-zinc-500">No comments yet.</p>
+            ) : (
+              comments.map((comment) => (
+                <div key={comment._id} className="text-sm text-zinc-300">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <span className="font-medium text-orange-400">
+                        @{comment.authorUsername}
+                      </span>{" "}
+                      <span>{comment.body}</span>
+                    </div>
+                    <span className="shrink-0 text-xs text-zinc-500">
+                      {formatCommentTime(comment.createdAt)}
+                    </span>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+
+          <div className="mt-4 flex items-center gap-2">
+            <input
+              type="text"
+              value={newComment}
+              onChange={(e) => setNewComment(e.target.value)}
+              placeholder="Add a comment..."
+              maxLength={250}
+              className="flex-1 rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-sm text-white placeholder:text-zinc-500 focus:border-orange-400/40 focus:outline-none"
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  void handlePostComment();
+                }
+              }}
+            />
+            <button
+              type="button"
+              onClick={() => void handlePostComment()}
+              disabled={!newComment.trim() || postingComment}
+              className="rounded-xl px-3 py-2 text-sm font-medium text-orange-400 transition hover:text-orange-300 disabled:cursor-not-allowed disabled:text-zinc-600"
+            >
+              {postingComment ? "Posting..." : "Post"}
+            </button>
+          </div>
+        </div>
+      )}
     </article>
   );
 }

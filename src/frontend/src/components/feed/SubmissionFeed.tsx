@@ -20,6 +20,7 @@ type FeedSubmission = {
   lang: string;
   createdAt?: string;
   updatedAt?: string;
+  commentCount?: number;
 };
 
 type FeedResponse =
