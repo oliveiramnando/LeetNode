@@ -6,8 +6,8 @@ const router = express.Router();
 
 router.get('/submissions', submissionFeed);
 
-router.get('/submissions/:submissionId', getSubmissionComments)
-router.post('/submissions/:submissionId', postSubmissionComment);
+router.get('/submissions/:submissionId/comments', getSubmissionComments)
+router.post('/submissions/:submissionId/comments', postSubmissionComment);
 
 
 
