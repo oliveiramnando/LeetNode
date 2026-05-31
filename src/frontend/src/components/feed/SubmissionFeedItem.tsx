@@ -49,6 +49,16 @@ type PostCommentResponse =
       message?: string;
     };
 
+type DeleteCommentResponse =
+  | {
+      success: true;
+      message?: string;
+    }
+  | {
+      success: false;
+      message?: string;
+    };
+
 function formatRelativeTime(unixSeconds?: number) {
   if (!unixSeconds || Number.isNaN(unixSeconds)) return "unknown time";
 
@@ -136,8 +146,10 @@ function getStatusStyles(status?: string) {
 
 export default function SubmissionFeedItem({
   submission,
+  currentUserId,
 }: {
   submission: FeedSubmission;
+  currentUserId: string;
 }) {
   const backend = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8080";
 
@@ -148,6 +160,7 @@ export default function SubmissionFeedItem({
   const [commentsError, setCommentsError] = useState("");
   const [newComment, setNewComment] = useState("");
   const [postingComment, setPostingComment] = useState(false);
+  const [deletingCommentId, setDeletingCommentId] = useState<string | null>(null);
   const [localCommentCount, setLocalCommentCount] = useState(
     submission.commentCount ?? 0
   );
@@ -160,17 +173,22 @@ export default function SubmissionFeedItem({
   const profileHref = `/profile/${encodeURIComponent(username)}`;
   const problemHref = `https://leetcode.com/problems/${submission.titleSlug}/`;
 
+  const isSubmissionOwner = submission.userId?._id === currentUserId;
+
   async function fetchComments() {
     try {
       setLoadingComments(true);
       setCommentsError("");
 
-      const res = await fetch(`${backend}/api/feed/submissions/${submission._id}/comments`, {
-        method: "GET",
-        credentials: "include",
-        headers: { Accept: "application/json" },
-        cache: "no-store",
-      });
+      const res = await fetch(
+        `${backend}/api/feed/submissions/${submission._id}/comments`,
+        {
+          method: "GET",
+          credentials: "include",
+          headers: { Accept: "application/json" },
+          cache: "no-store",
+        }
+      );
 
       const data: CommentsResponse = await res.json().catch(() => ({
         success: false,
@@ -214,15 +232,18 @@ export default function SubmissionFeedItem({
       setPostingComment(true);
       setCommentsError("");
 
-      const res = await fetch(`${backend}/api/feed/submissions/${submission._id}/comments`, {
-        method: "POST",
-        credentials: "include",
-        headers: {
-          Accept: "application/json",
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ userComment: trimmed }),
-      });
+      const res = await fetch(
+        `${backend}/api/feed/submissions/${submission._id}/comments`,
+        {
+          method: "POST",
+          credentials: "include",
+          headers: {
+            Accept: "application/json",
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ userComment: trimmed }),
+        }
+      );
 
       const data: PostCommentResponse = await res.json().catch(() => ({
         success: false,
@@ -249,6 +270,46 @@ export default function SubmissionFeedItem({
     }
   }
 
+  async function handleDeleteComment(commentId: string) {
+    if (deletingCommentId) return;
+
+    try {
+      setDeletingCommentId(commentId);
+      setCommentsError("");
+
+      const res = await fetch(
+        `${backend}/api/feed/submissions/${submission._id}/comments/${commentId}`,
+        {
+          method: "DELETE",
+          credentials: "include",
+          headers: {
+            Accept: "application/json",
+          },
+        }
+      );
+
+      const data: DeleteCommentResponse = await res.json().catch(() => ({
+        success: false,
+        message: "Invalid response from server",
+      }));
+
+      if (!res.ok || !data.success) {
+        throw new Error(
+          "message" in data && data.message
+            ? data.message
+            : "Failed to delete comment"
+        );
+      }
+
+      setComments((prev) => prev.filter((comment) => comment._id !== commentId));
+      setLocalCommentCount((prev) => Math.max(0, prev - 1));
+    } catch (err: any) {
+      setCommentsError(err?.message || "Failed to delete comment");
+    } finally {
+      setDeletingCommentId(null);
+    }
+  }
+
   return (
     <article className="rounded-2xl border border-white/10 bg-white/5 p-5 transition-colors hover:border-white/15 hover:bg-white/[0.06]">
       <div className="flex flex-wrap items-center gap-3">
@@ -268,7 +329,8 @@ export default function SubmissionFeedItem({
         </span>
 
         <span className="text-xs text-zinc-500">
-          {prettifyLang(submission.lang)} • {formatRelativeTime(submission.timeStamp)}
+          {prettifyLang(submission.lang)} •{" "}
+          {formatRelativeTime(submission.timeStamp)}
         </span>
       </div>
 
@@ -291,8 +353,8 @@ export default function SubmissionFeedItem({
           </span>
         ) : (
           <span>
-            Attempted <span className="text-zinc-300">{submission.title}</span> on
-            LeetCode.
+            Attempted <span className="text-zinc-300">{submission.title}</span>{" "}
+            on LeetCode.
           </span>
         )}
       </div>
@@ -321,21 +383,41 @@ export default function SubmissionFeedItem({
             ) : comments.length === 0 ? (
               <p className="text-sm text-zinc-500">No comments yet.</p>
             ) : (
-              comments.map((comment) => (
-                <div key={comment._id} className="text-sm text-zinc-300">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <span className="font-medium text-orange-400">
-                        @{comment.authorUsername}
-                      </span>{" "}
-                      <span>{comment.body}</span>
+              comments.map((comment) => {
+                const isCommentAuthor = comment.author === currentUserId;
+                const canDelete = isCommentAuthor || isSubmissionOwner;
+                const isDeleting = deletingCommentId === comment._id;
+
+                return (
+                  <div key={comment._id} className="text-sm text-zinc-300">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <span className="font-medium text-orange-400">
+                          @{comment.authorUsername}
+                        </span>{" "}
+                        <span>{comment.body}</span>
+                      </div>
+
+                      <div className="flex shrink-0 items-center gap-3">
+                        <span className="text-xs text-zinc-500">
+                          {formatCommentTime(comment.createdAt)}
+                        </span>
+
+                        {canDelete && (
+                          <button
+                            type="button"
+                            onClick={() => void handleDeleteComment(comment._id)}
+                            disabled={isDeleting}
+                            className="text-xs text-red-300 transition hover:text-red-200 disabled:cursor-not-allowed disabled:text-zinc-600"
+                          >
+                            {isDeleting ? "Deleting..." : "Delete"}
+                          </button>
+                        )}
+                      </div>
                     </div>
-                    <span className="shrink-0 text-xs text-zinc-500">
-                      {formatCommentTime(comment.createdAt)}
-                    </span>
                   </div>
-                </div>
-              ))
+                );
+              })
             )}
           </div>
 

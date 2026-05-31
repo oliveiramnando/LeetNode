@@ -26,6 +26,7 @@ type FeedSubmission = {
 type FeedResponse =
   | {
       success: true;
+      currentUserId: string;
       submissions: FeedSubmission[];
     }
   | {
@@ -49,6 +50,7 @@ export default function SubmissionFeed() {
   const [submissions, setSubmissions] = useState<FeedSubmission[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [currentUserId, setCurrentUserId] = useState("");
 
   useEffect(() => {
     let ignore = false;
@@ -79,11 +81,13 @@ export default function SubmissionFeed() {
         }
 
         if (!ignore) {
+          setCurrentUserId(data.currentUserId || "");
           setSubmissions(Array.isArray(data.submissions) ? data.submissions : []);
         }
       } catch (err: any) {
         if (!ignore) {
           setError(err?.message || "Failed to load submission feed");
+          setCurrentUserId("");
           setSubmissions([]);
         }
       } finally {
@@ -123,7 +127,9 @@ export default function SubmissionFeed() {
     if (submissions.length === 0) {
       return (
         <div className="rounded-2xl border border-white/10 bg-white/5 p-6">
-          <h2 className="text-base font-medium text-white">No feed activity yet</h2>
+          <h2 className="text-base font-medium text-white">
+            No feed activity yet
+          </h2>
           <p className="mt-2 text-sm text-zinc-400">
             Once you follow users with synced LeetCode activity, their recent
             submissions will show up here.
@@ -135,11 +141,15 @@ export default function SubmissionFeed() {
     return (
       <div className="space-y-4">
         {submissions.map((submission) => (
-          <SubmissionFeedItem key={submission._id} submission={submission} />
+          <SubmissionFeedItem
+            key={submission._id}
+            submission={submission}
+            currentUserId={currentUserId}
+          />
         ))}
       </div>
     );
-  }, [loading, error, submissions]);
+  }, [loading, error, submissions, currentUserId]);
 
   return <section>{content}</section>;
 }
