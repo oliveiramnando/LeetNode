@@ -2,3 +2,5 @@
 node_modules/
 notes.txt
 .next
+src/backend/routes/testRoutes.js
+src/backend/controllers/testController.js
