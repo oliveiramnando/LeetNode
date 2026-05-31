@@ -18,6 +18,7 @@ export const submissionFeed = async (req,res) => {
         if (followings.length === 0) {
             return res.status(200).json({
                 success: true,
+                cureentUserId,
                 submissions: [],
             });
         }
@@ -34,6 +35,7 @@ export const submissionFeed = async (req,res) => {
         if (followingUserIds.length === 0) {
             return res.status(200).json({
                 success: true,
+                currentUserId,
                 submissions: [],
             });
         }
@@ -89,6 +91,7 @@ export const submissionFeed = async (req,res) => {
 
         return res.status(200).json({
             success: true,
+            currentUserId,
             submissions
         });
 
@@ -149,5 +152,68 @@ export const postSubmissionComment = async (req,res) => {
             success: false,
             message: error.message
         })
+    }
+};
+
+export const deleteSubmissionComment = async (req, res) => {
+    try {
+        const { commentId } = req.params;
+        const userId = req.session?.userId;
+
+        if (!userId) {
+            return res.status(401).json({
+                success: false,
+                message: "Please log in to delete a comment"
+            });
+        }
+
+        if (!mongoose.Types.ObjectId.isValid(commentId)) {
+            return res.status(400).json({
+                success: false,
+                message: "Invalid comment id"
+            });
+        }
+
+        const comment = await Comment.findById(commentId);
+
+        if (!comment) {
+            return res.status(404).json({
+                success: false,
+                message: "Comment not found"
+            });
+        }
+
+        const submission = await lc_submission_events.findById(comment.submissionId);
+
+        if (!submission) {
+            return res.status(404).json({
+                success: false,
+                message: "Submission not found"
+            });
+        }
+
+        const isCommentAuthor = comment.author.toString() === userId.toString();
+        const isSubmissionOwner = submission.userId.toString() === userId.toString();
+
+        if (!isCommentAuthor && !isSubmissionOwner) {
+            return res.status(403).json({
+                success: false,
+                message: "You are not authorized to delete this comment"
+            });
+        }
+
+        await Comment.findByIdAndDelete(commentId);
+
+        return res.status(200).json({
+            success: true,
+            // currentUserId: userId,
+            message: "Comment deleted successfully"
+        });
+    } catch (error) {
+        console.log(error);
+        return res.status(500).json({
+            success: false,
+            message: error.message
+        });
     }
 };
