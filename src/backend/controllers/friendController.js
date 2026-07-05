@@ -42,8 +42,7 @@ export const follow = async (req,res) => {
 
             return res.status(503).json({ success: false, message: "LeetCode verification unavailable. Try again." });
         }
-        const follow = new Friend({ leetnodeUser: currentUserId, leetcodeUsername: target })
-        // console.log(follow)
+        const follow = new Friend({ leetnodeUser: currentUserId, leetcodeUsername: target });
 
         await follow.save();
 
@@ -85,8 +84,7 @@ export const unfollow = async (req,res) => {
         const existingFollow = await Friend.findOne({ leetnodeUser: currentUserId, leetcodeUsername: target })
         if (!existingFollow) return res.status(400).json({ success: false, message: "You are not following this user" });
 
-        const unfollow = await Friend.findOneAndDelete({ leetnodeUser: currentUserId, leetcodeUsername: target })
-        // console.log(unfollow)
+        const unfollow = await Friend.findOneAndDelete({ leetnodeUser: currentUserId, leetcodeUsername: target });
 
         return res.status(200).json({
             success: true,

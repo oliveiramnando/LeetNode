@@ -100,7 +100,6 @@ export const githubOAuthCallback = async (req, res) => {
         const githubUsername = userGithubData.data.login;
         const githubUrl = userGithubData.data.html_url;
         const githubID = userGithubData.data.id
-        // console.log(userGithubData);
 
         if (!githubID) {
             return res.status(400).json({ success: false, message: "Github ID missing" });

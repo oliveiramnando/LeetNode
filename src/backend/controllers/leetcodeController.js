@@ -33,18 +33,12 @@ function normalizeGithubUrl(url) {
 
 export const getUser = async (req,res) => {
     try {
-        console.log("EXPRESS raw cookie:", req.headers.cookie);
-        console.log("EXPRESS session:", req.session);
-
         const { username } = req.params;
         const userId = req.session?.userId;
         const leetcodeUsername = req.session?.leetcodeUsername;
 
-        console.log({ userId, leetcodeUsername });
-
         if (userId && leetcodeUsername && leetcodeUsername === String(username).toLowerCase()) {
             const syncResult = await syncSubmissionsIfNeeded(userId, leetcodeUsername);
-            console.log(syncResult);
         }
 
         const leetcode = new LeetCode();
@@ -62,7 +56,6 @@ export const getUser = async (req,res) => {
 export const me = async (req, res) => {
     try {
         const leetnodeUser = await User.findOne({ userId: req.session?.userId })
-        console.log(leetnodeUser);
 
         const username = leetnodeUser.leetcodeUsername;
 

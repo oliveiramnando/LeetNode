@@ -185,7 +185,7 @@ export const tagWeaknesses = async (req, res) => {
                     }
                 ).lean();
 
-                console.log("DB problems for", tagName, dbProblems.length);
+                // console.log("DB problems for", tagName, dbProblems.length);
                 if (dbProblems.length >= 20) {
                     return {
                         tag: tagName,
@@ -221,7 +221,7 @@ export const tagWeaknesses = async (req, res) => {
                         await fillLcProblems(leetcode, problem);
                     }
 
-                    console.log("done filling db for", tagName);
+                    // console.log("done filling db for", tagName);
 
                     dbProblems = await lc_problems.find(
                         {
