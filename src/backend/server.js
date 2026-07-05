@@ -11,7 +11,7 @@ import friendRoutes from "./routes/friendRoutes.js";
 import submissionRoutes from "./routes/submissionRoutes.js";
 import tagRoutes from "./routes/tagRoutes.js";
 import feedRoutes from "./routes/feedRoutes.js";
-import testRoutes from "./routes/testRoutes.js";
+// import testRoutes from "./routes/testRoutes.js";
 
 const PORT = process.env.PORT || 8080;
 const app = express();
