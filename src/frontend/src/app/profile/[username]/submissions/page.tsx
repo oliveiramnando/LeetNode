@@ -73,21 +73,39 @@ export default function SubmissionsAnalyticsPage({
   }, [me, username]);
 
   useEffect(() => {
+    if (loadingMe) return;
+
+    if (!isOwner) {
+      setData(null);
+      setLoadingData(false);
+      return;
+    }
+    
     if (!loadingMe && isOwner) {
       let alive = true;
+
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setLoadingData(true);
 
       (async () => {
         try {
-          // This assumes you have a Next API route that proxies to your backend.
-          // If your tagStrengths endpoint is directly on your backend, keep it proxied via /api to include cookies.
-          const res = await fetch("/api/submissions/strengths", { cache: "no-store" });
+          const res = await fetch("/api/submissions/strengths", {
+            cache: "no-store",
+          });
+
           const json = (await res.json()) as TagStrengthsResponse;
+
           if (!alive) return;
           setData(json);
-        } catch (e: any) {
+        } catch (e: unknown) {
           if (!alive) return;
-          setData({ success: false, message: e?.message ?? "Failed to load tag strengths." });
+
+          const message =
+            e instanceof Error
+              ? e.message
+              : "Failed to load tag strengths.";
+
+          setData({ success: false, message });
         } finally {
           if (!alive) return;
           setLoadingData(false);

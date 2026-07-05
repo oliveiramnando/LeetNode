@@ -164,7 +164,7 @@ export function deriveYearHeatmap(
   const cells: HeatmapCell[][] = Array.from({ length: 7 }, () =>
     Array.from({ length: weeks }, () => {
       const date = new Date(0);
-      return { date, iso: "1970-01-01", count: 0, level: 0 as 0 };
+      return { date, iso: "1970-01-01", count: 0, level: 0 as const };
     })
   );
 

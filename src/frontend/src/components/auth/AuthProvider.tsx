@@ -12,26 +12,34 @@ type MeUser = {
   leetcodeUsernameLower?: string | null;
 };
 
-type MeResponse =
-  | { loggedIn: false }
-  | { loggedIn: true; user: MeUser }
-  // allow older shape where backend returns { user: ... } without loggedIn
-  | { user: MeUser };
+type UnknownRecord = Record<string, unknown>;
 
-function normalizeMe(input: any): { loggedIn: boolean; user: MeUser | null } {
-  if (!input) return { loggedIn: false, user: null };
+function isRecord(value: unknown): value is UnknownRecord {
+  return typeof value === "object" && value !== null;
+}
 
-  // canonical
-  if (typeof input === "object" && "loggedIn" in input) {
-    const loggedIn = Boolean((input as any).loggedIn);
-    const user = loggedIn ? ((input as any).user ?? null) : null;
-    return { loggedIn, user };
+function normalizeMe(input: unknown): { loggedIn: boolean; user: MeUser | null } {
+  if (!isRecord(input)) return { loggedIn: false, user: null };
+
+  // canonical shape: { loggedIn: boolean, user?: {...} }
+  if ("loggedIn" in input) {
+    const loggedIn = Boolean(input.loggedIn);
+    const user = loggedIn && isRecord(input.user) ? input.user : null;
+
+    return {
+      loggedIn,
+      user: user as MeUser | null,
+    };
   }
 
   // older shape: { user: {...} }
-  if (typeof input === "object" && "user" in input) {
-    const user = (input as any).user ?? null;
-    return { loggedIn: Boolean(user), user };
+  if ("user" in input) {
+    const user = isRecord(input.user) ? input.user : null;
+
+    return {
+      loggedIn: Boolean(user),
+      user: user as MeUser | null,
+    };
   }
 
   return { loggedIn: false, user: null };
@@ -42,7 +50,7 @@ type AuthContextValue = {
   loggedIn: boolean;
   user: MeUser | null;
   refresh: () => Promise<void>;
-  signOutLocal: () => void; // immediate UI update; you still call backend signout separately
+  signOutLocal: () => void;
 };
 
 const AuthContext = React.createContext<AuthContextValue | null>(null);
@@ -59,6 +67,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const refresh = React.useCallback(async () => {
     setLoading(true);
+
     try {
       const res = await fetch(`${backend}/api/auth/me`, {
         method: "GET",
@@ -88,7 +97,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Fetch once on initial mount
   React.useEffect(() => {
-    refresh();
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void refresh();
   }, [refresh]);
 
   const signOutLocal = React.useCallback(() => {

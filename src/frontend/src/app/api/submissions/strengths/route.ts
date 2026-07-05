@@ -1,4 +1,4 @@
-//src/frontend/src/app/api/submissions/strengths/route.ts
+// src/frontend/src/app/api/submissions/strengths/route.ts
 import { NextResponse } from "next/server";
 import { cookies, headers } from "next/headers";
 
@@ -39,9 +39,11 @@ export async function GET() {
           upstream.headers.get("content-type") ?? "application/json",
       },
     });
-  } catch (e: any) {
+  } catch (e: unknown) {
+    const message = e instanceof Error ? e.message : "Proxy failed";
+
     return NextResponse.json(
-      { success: false, message: e?.message ?? "Proxy failed" },
+      { success: false, message },
       { status: 500 }
     );
   }

@@ -67,10 +67,10 @@ export default function SubmissionFeed() {
           cache: "no-store",
         });
 
-        const data: FeedResponse = await res.json().catch(() => ({
+        const data = (await res.json().catch(() => ({
           success: false,
           message: "Invalid response from server",
-        }));
+        }))) as FeedResponse;
 
         if (!res.ok || !data.success) {
           throw new Error(
@@ -84,9 +84,12 @@ export default function SubmissionFeed() {
           setCurrentUserId(data.currentUserId || "");
           setSubmissions(Array.isArray(data.submissions) ? data.submissions : []);
         }
-      } catch (err: any) {
+      } catch (err: unknown) {
         if (!ignore) {
-          setError(err?.message || "Failed to load submission feed");
+          const message =
+            err instanceof Error ? err.message : "Failed to load submission feed";
+
+          setError(message);
           setCurrentUserId("");
           setSubmissions([]);
         }

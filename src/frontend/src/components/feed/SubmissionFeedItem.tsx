@@ -59,6 +59,10 @@ type DeleteCommentResponse =
       message?: string;
     };
 
+function getErrorMessage(error: unknown, fallback: string) {
+  return error instanceof Error ? error.message : fallback;
+}
+
 function formatRelativeTime(unixSeconds?: number) {
   if (!unixSeconds || Number.isNaN(unixSeconds)) return "unknown time";
 
@@ -160,7 +164,9 @@ export default function SubmissionFeedItem({
   const [commentsError, setCommentsError] = useState("");
   const [newComment, setNewComment] = useState("");
   const [postingComment, setPostingComment] = useState(false);
-  const [deletingCommentId, setDeletingCommentId] = useState<string | null>(null);
+  const [deletingCommentId, setDeletingCommentId] = useState<string | null>(
+    null
+  );
   const [localCommentCount, setLocalCommentCount] = useState(
     submission.commentCount ?? 0
   );
@@ -207,8 +213,8 @@ export default function SubmissionFeedItem({
         Array.isArray(data.submissionComments) ? data.submissionComments : []
       );
       setCommentsLoaded(true);
-    } catch (err: any) {
-      setCommentsError(err?.message || "Failed to load comments");
+    } catch (err: unknown) {
+      setCommentsError(getErrorMessage(err, "Failed to load comments"));
     } finally {
       setLoadingComments(false);
     }
@@ -263,8 +269,8 @@ export default function SubmissionFeedItem({
       setNewComment("");
       setShowComments(true);
       setCommentsLoaded(true);
-    } catch (err: any) {
-      setCommentsError(err?.message || "Failed to post comment");
+    } catch (err: unknown) {
+      setCommentsError(getErrorMessage(err, "Failed to post comment"));
     } finally {
       setPostingComment(false);
     }
@@ -303,8 +309,8 @@ export default function SubmissionFeedItem({
 
       setComments((prev) => prev.filter((comment) => comment._id !== commentId));
       setLocalCommentCount((prev) => Math.max(0, prev - 1));
-    } catch (err: any) {
-      setCommentsError(err?.message || "Failed to delete comment");
+    } catch (err: unknown) {
+      setCommentsError(getErrorMessage(err, "Failed to delete comment"));
     } finally {
       setDeletingCommentId(null);
     }
@@ -368,8 +374,8 @@ export default function SubmissionFeedItem({
           {showComments
             ? "Hide comments"
             : localCommentCount === 1
-            ? "View 1 comment"
-            : `View all ${localCommentCount} comments`}
+              ? "View 1 comment"
+              : `View all ${localCommentCount} comments`}
         </button>
       </div>
 

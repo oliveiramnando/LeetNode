@@ -11,14 +11,6 @@ export default function FriendSearch() {
   const [status, setStatus] = useState("idle"); // idle | loading | error
   const [error, setError] = useState("");
 
-  // Clear error when user edits input again
-  useEffect(() => {
-    if (status === "error") {
-      setStatus("idle");
-      setError("");
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [query]);
 
   async function handleSearch(e) {
     e.preventDefault();
@@ -52,7 +44,7 @@ export default function FriendSearch() {
 
       // Success → go to profile page
       router.push(`/profile/${encodeURIComponent(username)}`);
-    } catch (err) {
+    } catch {
       setStatus("error");
       setError("Network error. Please try again.");
     } finally {
@@ -67,7 +59,14 @@ export default function FriendSearch() {
         <div className="relative">
           <input
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(e) => {
+              setQuery(e.target.value);
+
+              if (status === "error") {
+                setStatus("idle");
+                setError("");
+              }
+            }}
             placeholder="Search friends…"
             aria-label="Search friends"
             className="h-9 w-56 rounded-md border border-white/10 bg-[#141414] px-3 pr-20 text-sm text-white placeholder:text-zinc-500 outline-none focus:border-white/20"

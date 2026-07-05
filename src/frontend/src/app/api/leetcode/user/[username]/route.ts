@@ -1,7 +1,7 @@
 // src/frontend/src/app/api/leetcode/user/[username]/route.ts
 import { NextResponse } from "next/server";
 
-type AnyObj = Record<string, any>;
+type JsonObject = Record<string, unknown>;
 
 export async function GET(
   req: Request,
@@ -10,7 +10,6 @@ export async function GET(
   const { username } = await ctx.params;
   const base = process.env.BACKEND_URL || "http://localhost:8080";
   const cookie = req.headers.get("cookie") ?? "";
-  console.log("NEXT route cookie:", cookie);
 
   try {
     const userRes = await fetch(
@@ -32,10 +31,10 @@ export async function GET(
       );
     }
 
-    const userJson = (await userRes.json()) as AnyObj;
+    const userJson = (await userRes.json()) as JsonObject;
 
     return NextResponse.json({ user: userJson }, { status: 200 });
-  } catch (e) {
+  } catch (e: unknown) {
     return NextResponse.json(
       { error: "Failed to reach backend", details: String(e) },
       { status: 502 }

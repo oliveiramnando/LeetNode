@@ -5,6 +5,10 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/auth/AuthProvider";
 
+type LinkAccountResponse = {
+  message?: string;
+};
+
 export default function LinkAccountPage() {
   const router = useRouter();
   const backend =
@@ -66,22 +70,23 @@ export default function LinkAccountPage() {
         }
       );
 
-      const payload = await res.json().catch(() => ({}));
+      const payload = (await res.json().catch(() => ({}))) as LinkAccountResponse;
 
       if (!res.ok) {
         setError(
-          payload?.message ||
+          payload.message ||
             "Failed to link your LeetCode account."
         );
         return;
       }
 
-      // 🔥 Critical: refresh global auth state
+      // Critical: refresh global auth state
       await refresh();
 
       router.replace(`/profile/${encodeURIComponent(cleaned)}`);
-    } catch (e: any) {
-      setError(e?.message || "Something went wrong.");
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : "Something went wrong.";
+      setError(message);
     } finally {
       setSubmitting(false);
     }

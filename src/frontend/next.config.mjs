@@ -7,6 +7,9 @@ const nextConfig = {
       { protocol: "https", hostname: "leetcode.com" },
     ],
   },
+  experimental: {
+    turbopackFileSystemCacheForDev: true,
+  }
 };
 
 export default nextConfig;
