@@ -1,5 +1,7 @@
 import session from "express-session";
 
+const isProduction = process.env.NODE_ENV === "production";
+
 export default session({
     secret: process.env.SESSION_SECRET,
     resave: false,
