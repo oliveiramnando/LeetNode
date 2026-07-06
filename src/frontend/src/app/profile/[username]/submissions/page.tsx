@@ -37,6 +37,9 @@ export default function SubmissionsAnalyticsPage({
   params: { username: string };
 }) {
   const username = params?.username ?? "";
+  const backend =
+    process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8080";
+
   const [me, setMe] = useState<MeResponse | null>(null);
   const [loadingMe, setLoadingMe] = useState(true);
 
@@ -46,10 +49,15 @@ export default function SubmissionsAnalyticsPage({
   useEffect(() => {
     let alive = true;
 
-    (async () => {
+    async function loadMe() {
       try {
-        const res = await fetch("/api/me", { cache: "no-store" });
+        const res = await fetch(`${backend}/api/auth/me`, {
+          credentials: "include",
+          cache: "no-store",
+        });
+
         const json = (await res.json()) as MeResponse;
+
         if (!alive) return;
         setMe(json);
       } catch {
@@ -59,16 +67,22 @@ export default function SubmissionsAnalyticsPage({
         if (!alive) return;
         setLoadingMe(false);
       }
-    })();
+    }
+
+    loadMe();
 
     return () => {
       alive = false;
     };
-  }, []);
+  }, [backend]);
 
   const isOwner = useMemo(() => {
     if (!me || me.loggedIn === false) return false;
-    const viewer = normalizeLc(me.user.leetcodeUsernameLower ?? me.user.leetcodeUsername ?? "");
+
+    const viewer = normalizeLc(
+      me.user.leetcodeUsernameLower ?? me.user.leetcodeUsername ?? ""
+    );
+
     return viewer.length > 0 && viewer === normalizeLc(username);
   }, [me, username]);
 
@@ -80,48 +94,48 @@ export default function SubmissionsAnalyticsPage({
       setLoadingData(false);
       return;
     }
-    
-    if (!loadingMe && isOwner) {
-      let alive = true;
 
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setLoadingData(true);
+    let alive = true;
 
-      (async () => {
-        try {
-          const res = await fetch("/api/submissions/strengths", {
-            cache: "no-store",
-          });
+    setLoadingData(true);
 
-          const json = (await res.json()) as TagStrengthsResponse;
+    async function loadTagStrengths() {
+      try {
+        const res = await fetch(`${backend}/api/submissions/strengths`, {
+          credentials: "include",
+          cache: "no-store",
+        });
 
-          if (!alive) return;
-          setData(json);
-        } catch (e: unknown) {
-          if (!alive) return;
+        const json = (await res.json()) as TagStrengthsResponse;
 
-          const message =
-            e instanceof Error
-              ? e.message
-              : "Failed to load tag strengths.";
+        if (!alive) return;
+        setData(json);
+      } catch (e: unknown) {
+        if (!alive) return;
 
-          setData({ success: false, message });
-        } finally {
-          if (!alive) return;
-          setLoadingData(false);
-        }
-      })();
+        const message =
+          e instanceof Error ? e.message : "Failed to load tag strengths.";
 
-      return () => {
-        alive = false;
-      };
+        setData({ success: false, message });
+      } finally {
+        if (!alive) return;
+        setLoadingData(false);
+      }
     }
-  }, [loadingMe, isOwner]);
+
+    loadTagStrengths();
+
+    return () => {
+      alive = false;
+    };
+  }, [backend, loadingMe, isOwner]);
 
   if (loadingMe) {
     return (
       <div className="mx-auto w-full max-w-6xl px-6 py-10">
-        <div className="text-sm text-zinc-600 dark:text-zinc-400">Loading…</div>
+        <div className="text-sm text-zinc-600 dark:text-zinc-400">
+          Loading…
+        </div>
       </div>
     );
   }
@@ -133,9 +147,11 @@ export default function SubmissionsAnalyticsPage({
           <div className="text-xl font-semibold text-zinc-900 dark:text-zinc-50">
             Submission analytics is private
           </div>
+
           <div className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
             You can only view submission analysis for your own profile.
           </div>
+
           <div className="mt-4">
             <Link
               href={`/profile/${encodeURIComponent(username)}`}
@@ -160,11 +176,13 @@ export default function SubmissionsAnalyticsPage({
             <div className="text-sm text-zinc-600 dark:text-zinc-400">
               Submission Analysis
             </div>
+
             <div className="text-2xl font-semibold text-zinc-900 dark:text-zinc-50">
               Tag Strengths
             </div>
+
             <div className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
-              Based on accepted submissions (from your stored submission events).
+              Based on accepted submissions from your stored submission events.
             </div>
           </div>
 
@@ -178,11 +196,17 @@ export default function SubmissionsAnalyticsPage({
 
         <div className="rounded-2xl border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-950">
           {loadingData ? (
-            <div className="text-sm text-zinc-600 dark:text-zinc-400">Loading tag strengths…</div>
+            <div className="text-sm text-zinc-600 dark:text-zinc-400">
+              Loading tag strengths…
+            </div>
           ) : !data ? (
-            <div className="text-sm text-zinc-600 dark:text-zinc-400">No data yet.</div>
+            <div className="text-sm text-zinc-600 dark:text-zinc-400">
+              No data yet.
+            </div>
           ) : "success" in data && data.success === false ? (
-            <div className="text-sm text-red-600">{data.message ?? "Failed to load."}</div>
+            <div className="text-sm text-red-600">
+              {data.message ?? "Failed to load."}
+            </div>
           ) : tags.length === 0 ? (
             <div className="text-sm text-zinc-600 dark:text-zinc-400">
               No accepted submissions found yet.
@@ -194,12 +218,16 @@ export default function SubmissionsAnalyticsPage({
                   key={t.tag}
                   className="flex items-center justify-between rounded-xl border border-zinc-100 px-4 py-3 dark:border-zinc-900"
                 >
-                  <div className="font-medium text-zinc-900 dark:text-zinc-50">{t.tag}</div>
+                  <div className="font-medium text-zinc-900 dark:text-zinc-50">
+                    {t.tag}
+                  </div>
+
                   <div className="text-sm text-zinc-600 dark:text-zinc-400">
                     {t.acceptedCount}
                   </div>
                 </div>
               ))}
+
               {tags.length > 30 && (
                 <div className="pt-2 text-xs text-zinc-500 dark:text-zinc-500">
                   Showing top 30 tags.
