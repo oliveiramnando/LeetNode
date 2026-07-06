@@ -7,9 +7,19 @@ const nextConfig = {
       { protocol: "https", hostname: "leetcode.com" },
     ],
   },
+
+  async rewrites() {
+    return [
+      {
+        source: "/backend/:path*",
+        destination: "https://leetnode-b03i.onrender.com/:path*",
+      },
+    ];
+  },
+
   experimental: {
     turbopackFileSystemCacheForDev: true,
-  }
+  },
 };
 
 export default nextConfig;
