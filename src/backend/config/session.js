@@ -10,7 +10,7 @@ export default session({
         httpOnly: true,
         maxAge: 1000 * 60 * 60 * 24 * 7, // 7 days
         // maxAge: 1000 * 60 * 5 , // 5 minutes for testing
-        sameSite: 'lax', // fine for now, switch to none in prod
+        sameSite: isProduction ? "none" : "lax",
         secure: process.env.NODE_ENV === 'production', // should be tru in prod
     }
 })
