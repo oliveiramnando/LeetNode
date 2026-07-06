@@ -45,7 +45,18 @@ export const startGithubOAuth = async (req, res) => {
             state: state
         });
 
-        return res.redirect(`https://github.com/login/oauth/authorize/?${params.toString()}`);
+        req.session.save((err) => {
+            if (err) {
+                return res.status(500).json({
+                    success: false,
+                    message: "Failed to save OAuth session",
+                });
+            }
+
+            return res.redirect(
+                `https://github.com/login/oauth/authorize?${params.toString()}`
+            );
+        });
 
     } catch (error) {
         return res.status(500).json({

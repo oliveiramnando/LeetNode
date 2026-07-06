@@ -15,6 +15,7 @@ import feedRoutes from "./routes/feedRoutes.js";
 
 const PORT = process.env.PORT || 8080;
 const app = express();
+app.set("trust proxy", 1);
 
 console.log("1. imports finished");
 
