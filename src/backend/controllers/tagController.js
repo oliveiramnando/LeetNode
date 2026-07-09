@@ -194,7 +194,7 @@ export const tagWeaknesses = async (req, res) => {
                 }
 
                 if (inFlightTagFills.has(tagName)) {
-                    console.log("fill already in progress for", tagName);
+                    // console.log("fill already in progress for", tagName);
 
                     return {
                         tag: tagName,
