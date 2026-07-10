@@ -16,6 +16,8 @@ function normalizeLc(username: any) {
   return String(username || "").trim().toLowerCase();
 }
 
+type ProfileTab = "stats" | "analysis" | "tags";
+
 type Props = {
   profileUsername: string;
   solvedMetrics: any;
@@ -23,6 +25,40 @@ type Props = {
   matched: LeetNodeUserPayload["user"]["matchedUser"];
   recentSubmissionList: any[];
 };
+
+function TabButton({
+  active,
+  children,
+  onClick,
+}: {
+  active: boolean;
+  children: React.ReactNode;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={[
+        "rounded-xl px-4 py-2 text-sm font-medium transition",
+        "focus:outline-none focus:ring-2 focus:ring-emerald-400/40",
+        active
+          ? "border border-white/10 bg-white/[0.08] text-white"
+          : "border border-transparent text-zinc-300 hover:border-white/10 hover:bg-white/[0.055] hover:text-white",
+      ].join(" ")}
+      type="button"
+    >
+      {children}
+    </button>
+  );
+}
+
+function PrivateHint() {
+  return (
+    <div className="rounded-full border border-white/10 bg-white/[0.035] px-3 py-1.5 text-xs text-zinc-400">
+      Submission and tag analysis are private to the profile owner.
+    </div>
+  );
+}
 
 export function ProfileSections({
   profileUsername,
@@ -32,90 +68,78 @@ export function ProfileSections({
   recentSubmissionList,
 }: Props) {
   const { loading, loggedIn, user } = useAuth();
-  const [tab, setTab] = useState<"stats" | "analysis" | "tags">("stats");
+  const [tab, setTab] = useState<ProfileTab>("stats");
 
   const isOwner = useMemo(() => {
     if (loading) return false;
     if (!loggedIn || !user) return false;
-    const viewer = normalizeLc(user.leetcodeUsernameLower ?? user.leetcodeUsername ?? "");
+
+    const viewer = normalizeLc(
+      user.leetcodeUsernameLower ?? user.leetcodeUsername ?? ""
+    );
+
     const profile = normalizeLc(profileUsername);
+
     return viewer.length > 0 && viewer === profile;
   }, [loading, loggedIn, user, profileUsername]);
 
   React.useEffect(() => {
-    if ((tab === "analysis" || tab === "tags") && !isOwner) setTab("stats");
+    if ((tab === "analysis" || tab === "tags") && !isOwner) {
+      setTab("stats");
+    }
   }, [tab, isOwner]);
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center gap-2 rounded-2xl border border-zinc-700/40 bg-[#1f1f1f] p-2">
-        <button
-          onClick={() => setTab("stats")}
-          className={`rounded-xl px-4 py-2 text-sm font-medium transition ${
-            tab === "stats"
-              ? "bg-white text-black"
-              : "text-zinc-200 hover:bg-white/10"
-          }`}
-        >
-          LeetCode Stats
-        </button>
+    <section className="space-y-5">
+      <div className="flex flex-col gap-3 rounded-3xl border border-white/10 bg-zinc-950/55 p-2 shadow-[0_18px_45px_rgba(0,0,0,0.22)] backdrop-blur sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-wrap gap-2">
+          <TabButton active={tab === "stats"} onClick={() => setTab("stats")}>
+            LeetCode Stats
+          </TabButton>
 
-        {isOwner && (
-          <>
-            <button
-              onClick={() => setTab("analysis")}
-              className={`rounded-xl px-4 py-2 text-sm font-medium transition ${
-                tab === "analysis"
-                  ? "bg-white text-black"
-                  : "text-zinc-200 hover:bg-white/10"
-              }`}
-            >
-              Submissions Analysis
-            </button>
+          {isOwner ? (
+            <>
+              <TabButton
+                active={tab === "analysis"}
+                onClick={() => setTab("analysis")}
+              >
+                Submission Analysis
+              </TabButton>
 
-            <button
-              onClick={() => setTab("tags")}
-              className={`rounded-xl px-4 py-2 text-sm font-medium transition ${
-                tab === "tags"
-                  ? "bg-white text-black"
-                  : "text-zinc-200 hover:bg-white/10"
-              }`}
-            >
-              Tag Analysis
-            </button>
-          </>
-        )}
+              <TabButton active={tab === "tags"} onClick={() => setTab("tags")}>
+                Tag Analysis
+              </TabButton>
+            </>
+          ) : null}
+        </div>
 
-        {!loading && loggedIn && !isOwner && (
-          <div className="ml-auto pr-3 text-xs text-zinc-400">
-            Submission and tag analysis are private to the profile owner.
-          </div>
-        )}
+        {!loading && loggedIn && !isOwner ? <PrivateHint /> : null}
       </div>
 
-      <div className="rounded-2xl border border-zinc-700/40 bg-[#1f1f1f] p-4">
-        {tab === "stats" ? (
-          <div className="space-y-6">
-            <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 lg:items-start">
-              <SolvedOverviewCard metrics={solvedMetrics} />
+      {tab === "stats" ? (
+        <div className="space-y-5">
+          <div className="grid grid-cols-1 gap-5 lg:grid-cols-2 lg:items-start">
+            <SolvedOverviewCard metrics={solvedMetrics} />
 
-              <BadgesSection
-                badges={matched.badges}
-                upcomingBadges={matched.upcomingBadges}
-                activeBadgeId={matched.activeBadge?.id ?? null}
-              />
-            </div>
+            <BadgesSection
+              badges={matched.badges}
+              upcomingBadges={matched.upcomingBadges}
+              activeBadgeId={matched.activeBadge?.id ?? null}
+            />
+          </div>
 
-            <SubmissionHeatmap grid={heatmap} />
+          <SubmissionHeatmap grid={heatmap} />
+
+          <div className="space-y-5">
             <AttemptsInsights recent={recentSubmissionList} />
             <RecentSubmissionsTable submissions={recentSubmissionList} />
           </div>
-        ) : tab === "analysis" ? (
-          <SubmissionsAnalysisPanel profileUsername={profileUsername} />
-        ) : (
-          <TagAnalysisPanel profileUsername={profileUsername} />
-        )}
-      </div>
-    </div>
+        </div>
+      ) : tab === "analysis" ? (
+        <SubmissionsAnalysisPanel profileUsername={profileUsername} />
+      ) : (
+        <TagAnalysisPanel profileUsername={profileUsername} />
+      )}
+    </section>
   );
 }

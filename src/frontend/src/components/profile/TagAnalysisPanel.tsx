@@ -140,15 +140,15 @@ const TAG_TO_TOPIC: Record<string, Topic> = {
 };
 
 const BAR_COLORS = [
-  "#f97316",
-  "#fb923c",
-  "#fdba74",
-  "#f59e0b",
-  "#facc15",
-  "#f43f5e",
-  "#a855f7",
-  "#38bdf8",
+  "#10b981",
+  "#34d399",
+  "#6ee7b7",
+  "#14b8a6",
   "#22c55e",
+  "#84cc16",
+  "#eab308",
+  "#38bdf8",
+  "#818cf8",
   "#94a3b8",
 ];
 
@@ -170,48 +170,424 @@ function pct(value: number) {
   return `${Math.round(value * 100)}%`;
 }
 
-function SectionCard({
-  title,
-  subtitle,
+function lerp(start: number, end: number, amount: number) {
+  return Math.round(start + (end - start) * amount);
+}
+
+function getTagRankColor(index: number, total: number) {
+  const start = { r: 16, g: 185, b: 129 }; // #10b981 emerald
+  const end = { r: 251, g: 113, b: 133 }; // #fb7185 rose
+
+  const amount = total <= 1 ? 0 : index / (total - 1);
+
+  const r = lerp(start.r, end.r, amount);
+  const g = lerp(start.g, end.g, amount);
+  const b = lerp(start.b, end.b, amount);
+
+  return `rgb(${r}, ${g}, ${b})`;
+}
+
+function getDifficultyClass(difficulty?: string) {
+  const normalized = String(difficulty || "").toLowerCase();
+
+  if (normalized === "easy") {
+    return "border-emerald-400/20 bg-emerald-500/10 text-emerald-300";
+  }
+
+  if (normalized === "hard") {
+    return "border-rose-400/20 bg-rose-500/10 text-rose-300";
+  }
+
+  return "border-amber-400/20 bg-amber-500/10 text-amber-300";
+}
+
+function PanelCard({
   children,
-  right,
   className = "",
 }: {
-  title: string;
-  subtitle?: string;
   children: React.ReactNode;
-  right?: React.ReactNode;
   className?: string;
 }) {
   return (
     <div
-      className={`overflow-hidden rounded-3xl border border-white/10 bg-[linear-gradient(180deg,rgba(36,36,36,0.98),rgba(24,24,27,0.98))] shadow-[0_0_0_1px_rgba(255,255,255,0.02),0_18px_50px_rgba(0,0,0,0.32)] ${className}`}
+      className={[
+        "rounded-3xl border border-white/10",
+        "bg-zinc-950/55",
+        "shadow-[0_18px_45px_rgba(0,0,0,0.25)]",
+        "backdrop-blur",
+        className,
+      ].join(" ")}
     >
-      <div className="border-b border-white/8 bg-[radial-gradient(circle_at_top_left,rgba(249,115,22,0.14),transparent_42%)] px-5 py-4 sm:px-6">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <div className="text-base font-semibold tracking-tight text-white sm:text-lg">
-              {title}
-            </div>
-            {subtitle ? (
-              <div className="mt-1 text-sm text-zinc-400">{subtitle}</div>
-            ) : null}
-          </div>
-          {right ? <div className="shrink-0">{right}</div> : null}
-        </div>
-      </div>
-
-      <div className="p-5 sm:p-6">{children}</div>
+      {children}
     </div>
   );
 }
 
-function StatPill({ label, value }: { label: string; value: React.ReactNode }) {
+function SectionTitle({
+  title,
+  subtitle,
+  right,
+}: {
+  title: string;
+  subtitle?: string;
+  right?: React.ReactNode;
+}) {
   return (
-    <div className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-xs text-zinc-300">
-      <span className="text-zinc-400">{label}:</span>{" "}
-      <span className="font-medium text-zinc-100">{value}</span>
+    <div className="flex flex-col gap-3 border-b border-white/10 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+      <div>
+        <h3 className="text-base font-semibold tracking-tight text-white">
+          {title}
+        </h3>
+
+        {subtitle ? (
+          <p className="mt-1 text-sm text-zinc-400">{subtitle}</p>
+        ) : null}
+      </div>
+
+      {right ? <div className="shrink-0">{right}</div> : null}
     </div>
+  );
+}
+
+function StatCard({
+  label,
+  value,
+  hint,
+}: {
+  label: string;
+  value: React.ReactNode;
+  hint?: React.ReactNode;
+}) {
+  return (
+    <div className="rounded-2xl border border-white/10 bg-white/[0.035] p-4">
+      <div className="text-xs font-medium uppercase tracking-[0.16em] text-zinc-500">
+        {label}
+      </div>
+
+      <div className="mt-2 text-2xl font-semibold tracking-tight text-white">
+        {value}
+      </div>
+
+      {hint ? <div className="mt-1 text-xs text-zinc-400">{hint}</div> : null}
+    </div>
+  );
+}
+
+function EmptyState({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="flex min-h-[180px] items-center justify-center rounded-2xl border border-dashed border-white/10 bg-white/[0.02] p-5 text-center text-sm text-zinc-400">
+      {children}
+    </div>
+  );
+}
+
+function ErrorState({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="rounded-2xl border border-red-500/20 bg-red-500/[0.04] p-5 text-sm text-red-300">
+      {children}
+    </div>
+  );
+}
+
+function WeakTagCard({ tag }: { tag: WeakTag }) {
+  const failed = tag.failedSubmissions ?? tag.failedProblems ?? 0;
+  const attempted = tag.attemptedSubmissions ?? tag.attemptedProblems ?? 0;
+  const accepted = tag.acceptedSubmissions ?? tag.acceptedProblems ?? 0;
+  const acceptancePct = Math.round(tag.acceptanceRate * 100);
+
+  return (
+    <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="truncate text-base font-semibold text-white">
+            {tag.tag}
+          </div>
+
+          <div className="mt-1 text-xs text-zinc-500">
+            {accepted}/{attempted} accepted
+          </div>
+        </div>
+
+        <div className="rounded-full border border-rose-400/20 bg-rose-500/10 px-3 py-1 text-sm font-semibold text-rose-300">
+          {acceptancePct}%
+        </div>
+      </div>
+
+      <div className="mt-4 h-2.5 overflow-hidden rounded-full bg-white/10">
+        <div
+          className="h-full rounded-full bg-rose-400"
+          style={{ width: `${Math.max(0, Math.min(100, acceptancePct))}%` }}
+        />
+      </div>
+
+      <div className="mt-4 grid grid-cols-3 gap-3">
+        <div className="rounded-xl border border-white/10 bg-white/[0.035] p-3">
+          <div className="text-xs uppercase tracking-[0.14em] text-zinc-500">
+            Tried
+          </div>
+          <div className="mt-1 text-lg font-semibold text-white">
+            {attempted}
+          </div>
+        </div>
+
+        <div className="rounded-xl border border-white/10 bg-white/[0.035] p-3">
+          <div className="text-xs uppercase tracking-[0.14em] text-zinc-500">
+            Passed
+          </div>
+          <div className="mt-1 text-lg font-semibold text-emerald-400">
+            {accepted}
+          </div>
+        </div>
+
+        <div className="rounded-xl border border-white/10 bg-white/[0.035] p-3">
+          <div className="text-xs uppercase tracking-[0.14em] text-zinc-500">
+            Failed
+          </div>
+          <div className="mt-1 text-lg font-semibold text-zinc-200">
+            {failed}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function RecommendedProblems({
+  recommendations,
+}: {
+  recommendations: Recommendation[];
+}) {
+  return (
+    <PanelCard className="overflow-hidden">
+      <SectionTitle
+        title="Recommended Problems"
+        subtitle="Problems selected from your weakest areas."
+        right={
+          <div className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-xs text-zinc-400">
+            {recommendations.length} shown
+          </div>
+        }
+      />
+
+      <div className="p-5 sm:p-6">
+        {recommendations.length === 0 ? (
+          <EmptyState>No recommendations available yet.</EmptyState>
+        ) : (
+          <div className="space-y-3">
+            {recommendations.map((rec) => {
+              const href =
+                rec.url ||
+                (rec.libraryUrl
+                  ? `https://leetcode.com${rec.libraryUrl}`
+                  : `https://leetcode.com/problems/${rec.titleSlug}/`);
+
+              return (
+                <a
+                  key={rec.titleSlug}
+                  href={href}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="group block rounded-2xl border border-white/10 bg-white/[0.03] p-4 transition hover:border-amber-400/40 hover:bg-white/[0.055]"
+                >
+                  <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="min-w-0">
+                      <div className="truncate text-base font-semibold text-white">
+                        {rec.title}
+                      </div>
+
+                      <div className="mt-2 flex flex-wrap items-center gap-2">
+                        {rec.difficulty ? (
+                          <span
+                            className={[
+                              "rounded-full border px-2.5 py-1 text-xs font-medium",
+                              getDifficultyClass(rec.difficulty),
+                            ].join(" ")}
+                          >
+                            {rec.difficulty}
+                          </span>
+                        ) : null}
+
+                        {rec.matchedWeakTags?.map((tag) => (
+                          <span
+                            key={`${rec.titleSlug}-${tag}`}
+                            className="rounded-full border border-rose-400/20 bg-rose-500/10 px-2.5 py-1 text-xs text-rose-300"
+                          >
+                            {tag}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="shrink-0 text-sm font-medium text-amber-300 transition group-hover:translate-x-0.5">
+                      Open problem →
+                    </div>
+                  </div>
+                </a>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </PanelCard>
+  );
+}
+
+function TopTagsPanel({
+  tags,
+  maxBars,
+}: {
+  tags: Array<{ tag: string; acceptedCount: number }>;
+  maxBars: number;
+}) {
+  return (
+    <PanelCard className="h-full overflow-hidden">
+      <SectionTitle
+        title="Top Tags"
+        subtitle="Based on unique solved problems."
+        right={
+          <div className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-xs text-zinc-400">
+            All {tags.length}
+          </div>
+        }
+      />
+
+      <div className="p-5 sm:p-6">
+        <div className="max-h-[420px] overflow-y-auto pr-2">
+          <div className="space-y-4">
+            {tags.map((t, idx) => {
+              const width = Math.round((t.acceptedCount / maxBars) * 100);
+              const tone = getTagRankColor(idx, tags.length);
+
+              return (
+                <div key={t.tag}>
+                  <div className="mb-2 flex items-center justify-between gap-3 text-sm">
+                    <span className="truncate font-medium text-zinc-100">
+                      {t.tag}
+                    </span>
+
+                    <span className="rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 text-xs text-zinc-400">
+                      {t.acceptedCount}
+                    </span>
+                  </div>
+
+                  <div className="h-2.5 overflow-hidden rounded-full bg-white/10">
+                    <div
+                      className="h-full rounded-full"
+                      style={{
+                        width: `${width}%`,
+                        backgroundColor: tone,
+                      }}
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    </PanelCard>
+  );
+}
+
+function TopicDistributionPanel({
+  topicData,
+  topicMax,
+}: {
+  topicData: Array<{ topic: Topic; count: number }>;
+  topicMax: number;
+}) {
+  const nonZeroTopics = topicData
+    .filter((item) => item.count > 0)
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 5);
+
+  return (
+    <PanelCard className="h-full overflow-hidden">
+      <SectionTitle
+        title="Topic Coverage"
+        subtitle="Mapped from LeetCode tags into broader buckets."
+      />
+
+      <div className="grid gap-5 p-5 sm:p-6 xl:grid-cols-[1fr_0.8fr]">
+        <div className="h-[360px] min-w-0">
+          <ResponsiveContainer width="100%" height="100%">
+            <RadarChart data={topicData}>
+              <PolarGrid stroke="rgba(255,255,255,0.12)" />
+
+              <PolarAngleAxis
+                dataKey="topic"
+                tick={{ fontSize: 10, fill: "#d4d4d8" }}
+              />
+
+              <PolarRadiusAxis
+                domain={[0, topicMax]}
+                tick={{ fontSize: 10, fill: "#71717a" }}
+                axisLine={false}
+              />
+
+              <Tooltip
+                formatter={(value: any) => [value, "Count"]}
+                labelFormatter={(label: any) => String(label)}
+                contentStyle={{
+                  background: "#18181b",
+                  border: "1px solid rgba(255,255,255,0.10)",
+                  borderRadius: 14,
+                  color: "#fff",
+                }}
+              />
+
+              <Radar
+                dataKey="count"
+                stroke="#10b981"
+                fill="#10b981"
+                fillOpacity={0.22}
+                isAnimationActive={false}
+              />
+            </RadarChart>
+          </ResponsiveContainer>
+        </div>
+
+        <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+          <div className="text-xs font-medium uppercase tracking-[0.16em] text-zinc-500">
+            Strongest buckets
+          </div>
+
+          {nonZeroTopics.length === 0 ? (
+            <div className="mt-4 text-sm text-zinc-400">
+              No topic coverage yet.
+            </div>
+          ) : (
+            <div className="mt-4 space-y-3">
+              {nonZeroTopics.map((item, idx) => {
+                const width = Math.round((item.count / topicMax) * 100);
+
+                return (
+                  <div key={item.topic}>
+                    <div className="mb-2 flex items-center justify-between gap-3 text-sm">
+                      <span className="truncate text-zinc-200">
+                        {item.topic}
+                      </span>
+                      <span className="text-zinc-400">{item.count}</span>
+                    </div>
+
+                    <div className="h-2 overflow-hidden rounded-full bg-white/10">
+                      <div
+                        className="h-full rounded-full"
+                        style={{
+                          width: `${width}%`,
+                          backgroundColor:
+                            BAR_COLORS[idx % BAR_COLORS.length],
+                        }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+    </PanelCard>
   );
 }
 
@@ -224,17 +600,22 @@ export function TagAnalysisPanel({
 
   const [strengthsData, setStrengthsData] =
     React.useState<TagStrengthsResponse | null>(null);
+
   const [weaknessesData, setWeaknessesData] =
     React.useState<TagWeaknessesResponse | null>(null);
+
   const [loadingData, setLoadingData] = React.useState(false);
 
   const isOwner = React.useMemo(() => {
     if (loading) return false;
     if (!loggedIn || !user) return false;
+
     const viewer = normalizeLc(
       user.leetcodeUsernameLower ?? user.leetcodeUsername ?? ""
     );
+
     const profile = normalizeLc(profileUsername);
+
     return viewer.length > 0 && viewer === profile;
   }, [loading, loggedIn, user, profileUsername]);
 
@@ -266,18 +647,22 @@ export function TagAnalysisPanel({
 
         const strengthsJson =
           (await strengthsRes.json()) as TagStrengthsResponse;
+
         const weaknessesJson =
           (await weaknessesRes.json()) as TagWeaknessesResponse;
 
         if (!alive) return;
+
         setStrengthsData(strengthsJson);
         setWeaknessesData(weaknessesJson);
       } catch (e: any) {
         if (!alive) return;
+
         setStrengthsData({
           success: false,
           message: e?.message ?? "Failed to load tag strengths.",
         });
+
         setWeaknessesData({
           success: false,
           message: e?.message ?? "Failed to load tag weaknesses.",
@@ -293,18 +678,23 @@ export function TagAnalysisPanel({
     };
   }, [isOwner]);
 
-  if (loading) return <div className="text-sm text-zinc-300">Loading…</div>;
+  if (loading) {
+    return (
+      <PanelCard className="p-6 text-sm text-zinc-300">Loading…</PanelCard>
+    );
+  }
 
   if (!isOwner) {
     return (
-      <div className="rounded-3xl border border-white/10 bg-[linear-gradient(180deg,rgba(36,36,36,0.96),rgba(24,24,27,0.96))] p-6 shadow-[0_20px_60px_rgba(0,0,0,0.3)]">
+      <PanelCard className="p-6">
         <div className="text-lg font-semibold text-white">
           Tag analysis is private
         </div>
+
         <div className="mt-2 text-sm text-zinc-400">
           Only the profile owner can view tag analysis.
         </div>
-      </div>
+      </PanelCard>
     );
   }
 
@@ -335,294 +725,121 @@ export function TagAnalysisPanel({
       : [];
 
   const maxBars = Math.max(1, ...tags.map((t) => t.acceptedCount));
+
   const topicData = buildTopicDistribution(tagMap);
   const topicMax = Math.max(1, ...topicData.map((d) => d.count));
 
+  const stats =
+    strengthsData && strengthsData.success === true
+      ? strengthsData.stats
+      : undefined;
+
+  const strongestTag = tags[0]?.tag ?? "—";
+
   return (
     <div className="space-y-5">
-      <div className="rounded-3xl border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(249,115,22,0.18),transparent_28%),linear-gradient(180deg,rgba(36,36,36,0.96),rgba(24,24,27,0.96))] p-6 shadow-[0_20px_60px_rgba(0,0,0,0.35)]">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-          <div>
-            <div className="text-2xl font-semibold tracking-tight text-white">
-              Tag Analysis
-            </div>
-            <div className="mt-2 max-w-2xl text-sm text-zinc-400">
-              View your strongest topic tags, broader topic coverage, and the
-              tags where your acceptance rate is currently weakest.
-            </div>
-          </div>
+      <PanelCard className="overflow-hidden">
+        <div className="relative p-5 sm:p-6">
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(16,185,129,0.16),transparent_34%)]" />
 
-          <div className="flex flex-wrap gap-2">
-            {strengthsData &&
-              strengthsData.success === true &&
-              strengthsData.stats && (
-                <>
-                  {typeof strengthsData.stats.uniqueAcceptedProblemsCount ===
-                    "number" && (
-                    <StatPill
-                      label="Unique solved"
-                      value={strengthsData.stats.uniqueAcceptedProblemsCount}
-                    />
-                  )}
-                  {typeof strengthsData.stats.acceptedSubmissionsCount ===
-                    "number" && (
-                    <StatPill
-                      label="Accepted submissions"
-                      value={strengthsData.stats.acceptedSubmissionsCount}
-                    />
-                  )}
-                  {typeof strengthsData.stats.tagCount === "number" && (
-                    <StatPill
-                      label="Tracked tags"
-                      value={strengthsData.stats.tagCount}
-                    />
-                  )}
-                </>
-              )}
+          <div className="relative flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+              <div className="text-xs font-medium uppercase tracking-[0.22em] text-emerald-300">
+                Private dashboard
+              </div>
 
-            {weakestTags.length > 0 && (
-              <StatPill label="Weakest tags shown" value={weakestTags.length} />
-            )}
+              <h2 className="mt-2 text-2xl font-semibold tracking-tight text-white">
+                Tag Analysis
+              </h2>
+
+              <p className="mt-2 max-w-2xl text-sm leading-6 text-zinc-400">
+                See your strongest LeetCode tags, broader topic coverage, weak
+                areas, and suggested problems to close the gaps.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:min-w-[560px]">
+              <StatCard
+                label="Solved"
+                value={stats?.uniqueAcceptedProblemsCount ?? "—"}
+                hint="Unique problems"
+              />
+
+              <StatCard
+                label="Accepted"
+                value={stats?.acceptedSubmissionsCount ?? "—"}
+                hint="Submissions"
+              />
+
+              <StatCard
+                label="Tags"
+                value={stats?.tagCount ?? tags.length}
+                hint="Tracked"
+              />
+
+              <StatCard
+                label="Strongest"
+                value={strongestTag}
+                hint="Top tag"
+              />
+            </div>
           </div>
         </div>
-      </div>
+      </PanelCard>
 
       {loadingData ? (
-        <div className="rounded-3xl border border-white/10 bg-[linear-gradient(180deg,rgba(36,36,36,0.96),rgba(24,24,27,0.96))] p-6 text-sm text-zinc-300">
-          Loading…
-        </div>
+        <PanelCard className="p-6 text-sm text-zinc-300">Loading…</PanelCard>
       ) : !strengthsData ? (
-        <div className="rounded-3xl border border-white/10 bg-[linear-gradient(180deg,rgba(36,36,36,0.96),rgba(24,24,27,0.96))] p-6 text-sm text-zinc-300">
+        <PanelCard className="p-6 text-sm text-zinc-300">
           No data yet.
-        </div>
+        </PanelCard>
       ) : strengthsData.success === false ? (
-        <div className="rounded-3xl border border-red-500/20 bg-[linear-gradient(180deg,rgba(36,36,36,0.96),rgba(24,24,27,0.96))] p-6 text-sm text-red-400">
-          {strengthsData.message ?? "Failed to load."}
-        </div>
+        <PanelCard className="p-6">
+          <ErrorState>{strengthsData.message ?? "Failed to load."}</ErrorState>
+        </PanelCard>
       ) : tags.length === 0 ? (
-        <div className="rounded-3xl border border-white/10 bg-[linear-gradient(180deg,rgba(36,36,36,0.96),rgba(24,24,27,0.96))] p-6 text-sm text-zinc-300">
-          No accepted submissions found yet.
-        </div>
+        <PanelCard className="p-6">
+          <EmptyState>No accepted submissions found yet.</EmptyState>
+        </PanelCard>
       ) : (
         <>
-          <SectionCard
-            title="Weakest Tags"
-            subtitle="Lowest acceptance rate among tags with at least 2 attempted problems."
-          >
-            {weaknessesData && weaknessesData.success === false ? (
-              <div className="text-sm text-red-400">
-                {weaknessesData.message ?? "Failed to load weakest tags."}
-              </div>
-            ) : weakestTags.length === 0 ? (
-              <div className="text-sm text-zinc-400">
-                No weakest-tag data yet.
-              </div>
-            ) : (
-              <div className="space-y-5">
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-                  {weakestTags.map((tag) => {
-                    const failed =
-                      tag.failedSubmissions ?? tag.failedProblems ?? 0;
-                    const attempted =
-                      tag.attemptedSubmissions ?? tag.attemptedProblems ?? 0;
-                    const accepted =
-                      tag.acceptedSubmissions ?? tag.acceptedProblems ?? 0;
-
-                    return (
-                      <div
-                        key={tag.tag}
-                        className="rounded-2xl border border-white/10 bg-white/[0.03] p-4"
-                      >
-                        <div className="text-base font-semibold text-white">
-                          {tag.tag}
-                        </div>
-
-                        <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
-                          <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
-                            <div className="text-zinc-500">Acceptance</div>
-                            <div className="mt-1 font-medium text-rose-400">
-                              {pct(tag.acceptanceRate)}
-                            </div>
-                          </div>
-                          <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
-                            <div className="text-zinc-500">Failed</div>
-                            <div className="mt-1 font-medium text-white">
-                              {failed}
-                            </div>
-                          </div>
-                          <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
-                            <div className="text-zinc-500">Attempted</div>
-                            <div className="mt-1 font-medium text-white">
-                              {attempted}
-                            </div>
-                          </div>
-                          <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
-                            <div className="text-zinc-500">Accepted</div>
-                            <div className="mt-1 font-medium text-emerald-400">
-                              {accepted}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-
-                <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-4">
-                  <div className="mb-3 flex items-start justify-between gap-3">
-                    <div>
-                      <div className="text-base font-semibold text-white">
-                        Recommended Problems
-                      </div>
-                      <div className="mt-1 text-sm text-zinc-400">
-                        Medium problems selected from your weakest areas.
-                      </div>
-                    </div>
-                    <div className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-xs text-zinc-400">
-                      {recommendations.length} shown
-                    </div>
-                  </div>
-
-                  {recommendations.length === 0 ? (
-                    <div className="text-sm text-zinc-400">
-                      No recommendations available yet.
-                    </div>
-                  ) : (
-                    <div className="space-y-3">
-                      {recommendations.map((rec) => (
-                        <a
-                          key={rec.titleSlug}
-                          href={
-                            rec.url ||
-                            (rec.libraryUrl
-                              ? `https://leetcode.com${rec.libraryUrl}`
-                              : `https://leetcode.com/problems/${rec.titleSlug}/`)
-                          }
-                          target="_blank"
-                          rel="noreferrer"
-                          className="block rounded-2xl border border-white/10 bg-white/[0.03] p-4 transition hover:border-orange-400/30 hover:bg-white/[0.05]"
-                        >
-                          <div className="flex items-center justify-between gap-4">
-                            <div className="min-w-0">
-                              <div className="truncate text-sm font-semibold text-white sm:text-base">
-                                {rec.title}
-                              </div>
-
-                              <div className="mt-2 flex flex-wrap items-center gap-2">
-                                {rec.difficulty ? (
-                                  <span className="rounded-full border border-orange-400/20 bg-orange-500/10 px-2.5 py-1 text-xs font-medium text-orange-300">
-                                    {rec.difficulty}
-                                  </span>
-                                ) : null}
-
-                                {rec.matchedWeakTags && rec.matchedWeakTags.length > 0
-                                  ? rec.matchedWeakTags.map((tag) => (
-                                      <span
-                                        key={`${rec.titleSlug}-${tag}`}
-                                        className="rounded-full border border-rose-400/20 bg-rose-500/10 px-2.5 py-1 text-xs text-rose-300"
-                                      >
-                                        {tag}
-                                      </span>
-                                    ))
-                                  : null}
-                              </div>
-                            </div>
-
-                            <div className="shrink-0 text-sm font-medium text-orange-300">
-                              Open problem →
-                            </div>
-                          </div>
-                        </a>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-          </SectionCard>
-
-          <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
-            <SectionCard
-              title="Top Tags"
-              subtitle="Based on unique solved problems."
+          <PanelCard className="overflow-hidden">
+            <SectionTitle
+              title="Weakest Tags"
+              subtitle="Lowest acceptance rate among tags with at least 2 attempted problems."
               right={
                 <div className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-xs text-zinc-400">
-                  All {tags.length}
+                  {weakestTags.length} shown
                 </div>
               }
-              className="h-full"
-            >
-              <div className="h-[420px] overflow-y-auto pr-2">
-                <div className="space-y-4">
-                  {tags.map((t, idx) => {
-                    const width = Math.round((t.acceptedCount / maxBars) * 100);
-                    const tone = BAR_COLORS[idx % BAR_COLORS.length];
+            />
 
-                    return (
-                      <div key={t.tag} className="space-y-2">
-                        <div className="flex items-center justify-between gap-3 text-sm">
-                          <span className="truncate font-medium text-zinc-100">
-                            {t.tag}
-                          </span>
-                          <span className="rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 text-xs text-zinc-400">
-                            {t.acceptedCount}
-                          </span>
-                        </div>
-
-                        <div className="h-2.5 w-full overflow-hidden rounded-full bg-white/[0.06]">
-                          <div
-                            className="h-full rounded-full"
-                            style={{
-                              width: `${width}%`,
-                              background: `linear-gradient(90deg, ${tone}, #fb923c)`,
-                            }}
-                          />
-                        </div>
-                      </div>
-                    );
-                  })}
+            <div className="p-5 sm:p-6">
+              {weaknessesData && weaknessesData.success === false ? (
+                <ErrorState>
+                  {weaknessesData.message ?? "Failed to load weakest tags."}
+                </ErrorState>
+              ) : weakestTags.length === 0 ? (
+                <EmptyState>No weakest-tag data yet.</EmptyState>
+              ) : (
+                <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+                  {weakestTags.map((tag) => (
+                    <WeakTagCard key={tag.tag} tag={tag} />
+                  ))}
                 </div>
-              </div>
-            </SectionCard>
+              )}
+            </div>
+          </PanelCard>
 
-            <SectionCard
-              title="Topic Tags Distribution"
-              subtitle="Mapped from LeetCode tags into broader topic buckets."
-              className="h-full"
-            >
-              <div className="h-[420px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <RadarChart data={topicData}>
-                    <PolarGrid stroke="rgba(255,255,255,0.12)" />
-                    <PolarAngleAxis
-                      dataKey="topic"
-                      tick={{ fontSize: 10, fill: "#d4d4d8" }}
-                    />
-                    <PolarRadiusAxis
-                      domain={[0, topicMax]}
-                      tick={{ fontSize: 10, fill: "#71717a" }}
-                      axisLine={false}
-                    />
-                    <Tooltip
-                      formatter={(value: any) => [value, "Count"]}
-                      labelFormatter={(label: any) => String(label)}
-                      contentStyle={{
-                        background: "#18181b",
-                        border: "1px solid rgba(255,255,255,0.08)",
-                        borderRadius: 16,
-                        color: "#fff",
-                      }}
-                    />
-                    <Radar
-                      dataKey="count"
-                      stroke="#f97316"
-                      fill="#f97316"
-                      fillOpacity={0.22}
-                    />
-                  </RadarChart>
-                </ResponsiveContainer>
-              </div>
-            </SectionCard>
+          <RecommendedProblems recommendations={recommendations} />
+
+          <div className="grid grid-cols-1 gap-5 xl:grid-cols-[0.85fr_1.15fr]">
+            <TopTagsPanel tags={tags} maxBars={maxBars} />
+
+            <TopicDistributionPanel
+              topicData={topicData}
+              topicMax={topicMax}
+            />
           </div>
         </>
       )}

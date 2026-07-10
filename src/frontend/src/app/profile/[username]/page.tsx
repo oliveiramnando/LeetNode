@@ -10,6 +10,10 @@ import { ProfileSections } from "@/components/profile/ProfileSections";
 import { EmptyState } from "@/components/profile/EmptyState";
 import { ProfileSocialActions } from "@/components/profile/ProfileSocialActions";
 
+type ProfilePageParams = {
+  params: Promise<{ username: string }>;
+};
+
 async function getProfile(username: string): Promise<LeetNodeUserPayload | null> {
   const origin = process.env.APP_ORIGIN || "http://localhost:3000";
   const incomingHeaders = await headers();
@@ -31,53 +35,51 @@ async function getProfile(username: string): Promise<LeetNodeUserPayload | null>
   return normalizeBackendLeetCodeUser(json);
 }
 
-export default async function ProfilePage({
-  params,
-}: {
-  params: Promise<{ username: string }> | { username: string };
-}) {
-  const resolvedParams = await params;
-  const username = resolvedParams?.username;
+function PageShell({ children }: { children: React.ReactNode }) {
+  return (
+    <main className="mx-auto w-full max-w-6xl px-6 py-10">
+      {children}
+    </main>
+  );
+}
+
+export default async function ProfilePage({ params }: ProfilePageParams) {
+  const { username } = await params;
 
   if (!username) {
     return (
-      <div className="mx-auto w-full max-w-6xl px-6 py-10">
+      <PageShell>
         <EmptyState
           title="Missing username"
           description="No username was provided in the route."
         />
-      </div>
+      </PageShell>
     );
   }
 
   const payload = await getProfile(username);
+  const matched = payload?.user?.matchedUser;
 
-  if (!payload?.user?.matchedUser) {
+  if (!matched) {
     return (
-      <div className="mx-auto w-full max-w-6xl px-6 py-10">
+      <PageShell>
         <EmptyState
           title="Profile unavailable"
-          description="Backend response didn’t include the fields needed for this UI yet."
+          description="Backend response did not include the fields needed for this UI yet."
         />
-      </div>
+      </PageShell>
     );
   }
-
-  const matched = payload.user.matchedUser;
 
   const solvedMetrics = deriveSolvedOverview(
     payload.user.allQuestionsCount,
     matched.submitStats
   );
 
-  const heatmap = deriveYearHeatmap(
-    matched.submissionCalendar,
-    new Date(),
-    52
-  );
+  const heatmap = deriveYearHeatmap(matched.submissionCalendar, new Date(), 52);
 
   return (
-    <div className="mx-auto w-full max-w-6xl px-6 py-10">
+    <PageShell>
       <div className="space-y-6">
         <ProfileHeader
           user={matched}
@@ -92,6 +94,6 @@ export default async function ProfilePage({
           recentSubmissionList={payload.user.recentSubmissionList}
         />
       </div>
-    </div>
+    </PageShell>
   );
 }
