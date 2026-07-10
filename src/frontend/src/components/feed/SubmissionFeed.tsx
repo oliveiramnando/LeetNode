@@ -34,18 +34,33 @@ type FeedResponse =
       message?: string;
     };
 
-function LoadingCard() {
+function LoadingPost() {
   return (
-    <div className="animate-pulse rounded-2xl border border-white/10 bg-white/5 p-5">
-      <div className="h-4 w-32 rounded bg-white/10" />
-      <div className="mt-4 h-5 w-64 rounded bg-white/10" />
-      <div className="mt-3 h-4 w-40 rounded bg-white/10" />
+    <div className="overflow-hidden rounded-2xl border border-white/[0.08] bg-[#111214]">
+      <div className="flex animate-pulse items-center gap-3 px-4 py-3.5">
+        <div className="h-10 w-10 rounded-full bg-white/[0.07]" />
+        <div className="space-y-2">
+          <div className="h-3 w-28 rounded bg-white/[0.07]" />
+          <div className="h-2.5 w-16 rounded bg-white/[0.04]" />
+        </div>
+      </div>
+
+      <div className="animate-pulse border-y border-white/[0.06] bg-[#0c0d0f] px-5 py-12">
+        <div className="mx-auto h-6 w-56 max-w-full rounded bg-white/[0.08]" />
+        <div className="mx-auto mt-4 h-3 w-36 max-w-full rounded bg-white/[0.04]" />
+      </div>
+
+      <div className="animate-pulse space-y-3 px-4 py-4">
+        <div className="h-3 w-32 rounded bg-white/[0.06]" />
+        <div className="h-3 w-52 max-w-full rounded bg-white/[0.04]" />
+      </div>
     </div>
   );
 }
 
 export default function SubmissionFeed() {
-  const backend = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8080";
+  const backend =
+    process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8080";
 
   const [submissions, setSubmissions] = useState<FeedSubmission[]>([]);
   const [loading, setLoading] = useState(true);
@@ -76,31 +91,32 @@ export default function SubmissionFeed() {
           throw new Error(
             "message" in data && data.message
               ? data.message
-              : "Failed to load submission feed"
+              : "Failed to load submission feed",
           );
         }
 
         if (!ignore) {
           setCurrentUserId(data.currentUserId || "");
-          setSubmissions(Array.isArray(data.submissions) ? data.submissions : []);
+          setSubmissions(
+            Array.isArray(data.submissions) ? data.submissions : [],
+          );
         }
       } catch (err: unknown) {
         if (!ignore) {
-          const message =
-            err instanceof Error ? err.message : "Failed to load submission feed";
-
-          setError(message);
+          setError(
+            err instanceof Error
+              ? err.message
+              : "Failed to load submission feed",
+          );
           setCurrentUserId("");
           setSubmissions([]);
         }
       } finally {
-        if (!ignore) {
-          setLoading(false);
-        }
+        if (!ignore) setLoading(false);
       }
     }
 
-    loadFeed();
+    void loadFeed();
 
     return () => {
       ignore = true;
@@ -110,31 +126,36 @@ export default function SubmissionFeed() {
   const content = useMemo(() => {
     if (loading) {
       return (
-        <div className="space-y-4">
-          <LoadingCard />
-          <LoadingCard />
-          <LoadingCard />
-          <LoadingCard />
+        <div className="space-y-5">
+          <LoadingPost />
+          <LoadingPost />
+          <LoadingPost />
         </div>
       );
     }
 
     if (error) {
       return (
-        <div className="rounded-2xl border border-red-500/20 bg-red-500/10 p-5">
-          <p className="text-sm text-red-300">{error}</p>
+        <div className="rounded-2xl border border-red-500/15 bg-red-500/[0.05] px-5 py-5">
+          <p className="text-sm font-semibold text-red-300">
+            Unable to load feed
+          </p>
+          <p className="mt-1 text-sm text-red-300/70">{error}</p>
         </div>
       );
     }
 
     if (submissions.length === 0) {
       return (
-        <div className="rounded-2xl border border-white/10 bg-white/5 p-6">
-          <h2 className="text-base font-medium text-white">
-            No feed activity yet
+        <div className="rounded-2xl border border-dashed border-white/[0.1] bg-[#111214] px-6 py-14 text-center">
+          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full border border-emerald-500/20 bg-emerald-500/[0.08] text-emerald-300">
+            ↗
+          </div>
+          <h2 className="mt-4 text-base font-semibold text-white">
+            No posts yet
           </h2>
-          <p className="mt-2 text-sm text-zinc-400">
-            Once you follow users with synced LeetCode activity, their recent
+          <p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-zinc-500">
+            Follow users with synced LeetCode activity and their latest
             submissions will show up here.
           </p>
         </div>
@@ -142,7 +163,7 @@ export default function SubmissionFeed() {
     }
 
     return (
-      <div className="space-y-4">
+      <div className="space-y-5">
         {submissions.map((submission) => (
           <SubmissionFeedItem
             key={submission._id}
@@ -154,5 +175,7 @@ export default function SubmissionFeed() {
     );
   }, [loading, error, submissions, currentUserId]);
 
-  return <section>{content}</section>;
+  return (
+    <section className="mx-auto w-full max-w-xl min-w-0">{content}</section>
+  );
 }
