@@ -1,3 +1,4 @@
+// src/frontend/src/components/profile/ProfileSections.tsx
 "use client";
 
 import React, { useMemo, useState } from "react";
