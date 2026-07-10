@@ -1,5 +1,4 @@
 import Friend from "../models/Friend.js";
-import User from "../models/User.js";
 import { LeetCode } from "leetcode-query";
 
 async function verifyLeetcodeUser(leetcodeUsername, timeoutMs = 5000) {
@@ -71,7 +70,6 @@ export const unfollow = async (req,res) => {
     try {
         const { leetcodeUsername } = req.params;
         const currentUserId = req.session?.userId;
-        // const currentUserId = new mongoose.Types.ObjectId(); testing
         const currentLeetcodeUsername = req.session?.leetcodeUsername;
 
         const target = String(leetcodeUsername).trim().toLowerCase();
@@ -157,10 +155,27 @@ export const getFollowers = async (req,res) => {
         if (!currentUserId) return res.status(401).json({ success: false, message: "please log in to view folllowers"});
         if (!currentLeetcodeUsername) return res.status(401).json({ success: false, message: "Please link your leetcode account"});
 
-        const followers = await Friend.find({ leetcodeUsername: currentLeetcodeUsername });
-        // if (!followers) return res.status(400).json({ success: false, message: "unable to get fetch user followers" });
+        // Find all follow records where the current user's LeetCode username 
+        // is the account being followed. Populate `leetnodeUser` so the follower's
+        // User document replaces the stored ObjectId, allowing access to
+        // `record.leetnodeUser.leetcodeUsername`. Only fetch the follower's `_id`
+        // and `leetcodeUsername`, sort newest followers first, and return plain objects.
 
-        // in front end should display only leetNodeuser cause that's whos following them
+        const followerRecords = await Friend.find({ leetcodeUsername: currentLeetcodeUsername })
+            .populate({
+                path: 'leetnodeUser',
+                select: '_id leetcodeUsername' 
+            }).sort({ createdAt: -1 }).lean();
+
+        const followers = followerRecords.filter((record) => record.leetnodeUser?.leetcodeUsername)
+        .map((record) => ({
+            _id: record._id,
+            userId: record.leetnodeUser._id,
+            leetcodeUsername: record.leetnodeUser.leetcodeUsername,
+            createdAt: record.createdAt,
+        }));
+
+        console.log("Followers:", followers);
         return res.status(200).json({
             success: true,
             message: "User Followers",
@@ -182,7 +197,6 @@ export const getFollowing = async (req,res) => {
         if (!currentUserId) return res.status(401).json({ success: false, message: "Please log in to view following" });
 
         const following = await Friend.find({ leetnodeUser: currentUserId });
-        // if (!following) return res.status(400).json({ success: false, message: "unable to get fetch user following" });
 
         return res.status(200).json({
             success: true,
