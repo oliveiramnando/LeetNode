@@ -1,3 +1,4 @@
+// src/frontend/src/components/feed/SubmissionFeedItem.tsx
 "use client";
 
 import Link from "next/link";

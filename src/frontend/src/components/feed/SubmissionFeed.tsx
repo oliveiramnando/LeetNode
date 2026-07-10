@@ -1,6 +1,8 @@
+// src/frontend/src/components/feed/SubmissionFeed.tsx
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import FriendStreaksCard from "./FriendStreaksCard";
 import SubmissionFeedItem from "./SubmissionFeedItem";
 
 type FeedUser = {
@@ -176,6 +178,19 @@ export default function SubmissionFeed() {
   }, [loading, error, submissions, currentUserId]);
 
   return (
-    <section className="mx-auto w-full max-w-xl min-w-0">{content}</section>
+    <section className="mx-auto grid w-full max-w-[1600px] min-w-0 items-start gap-8 xl:grid-cols-[minmax(0,1fr)_576px_minmax(0,1fr)]">
+      <div className="hidden xl:block" aria-hidden="true" />
+
+      <div className="w-full min-w-0">{content}</div>
+
+      <aside className="hidden w-[360px] justify-self-start xl:block">
+        <div className="fixed top-1/2 w-[360px] -translate-y-1/2">
+          <FriendStreaksCard
+            backend={backend}
+            currentUserId={currentUserId}
+          />
+        </div>
+      </aside>
+    </section>
   );
 }
