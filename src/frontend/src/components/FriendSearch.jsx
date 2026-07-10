@@ -68,8 +68,8 @@ export default function FriendSearch() {
                 setError("");
               }
             }}
-            placeholder="Search friends…"
-            aria-label="Search friends"
+            placeholder="User search"
+            aria-label="User search"
             className="h-9 w-56 rounded-xl border border-white/10 bg-white/[0.04] px-3 pr-20 text-sm text-zinc-100 placeholder:text-zinc-500 outline-none transition focus:border-emerald-400/30 focus:bg-white/[0.06]"
           />
 
