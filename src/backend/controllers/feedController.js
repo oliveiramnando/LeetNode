@@ -9,36 +9,28 @@ export const submissionFeed = async (req,res) => {
         const currentUserId = req.session?.userId;
         if (!currentUserId) return res.status(401).json({ success: false, message: "Please log in to view following" });
 
+        const currentUserObjectId = new mongoose.Types.ObjectId(currentUserId);
+
         const followingsLeetcodeUsername = await Friend.find({ leetnodeUser: currentUserId }, { leetcodeUsername: 1 }).lean();
 
         const followings = [...new Set(
             followingsLeetcodeUsername.map((friend) => friend.leetcodeUsername?.trim().toLowerCase()).filter(Boolean)
         )];
-
-        if (followings.length === 0) {
-            return res.status(200).json({
-                success: true,
-                cureentUserId,
-                submissions: [],
-            });
-        }
     
-        const userFollowings = await User.find( // if empty then the user doesn't have a leetcode account
-            { leetcodeUsernameLower: { $in: followings } },
-            { _id: 1, leetcodeUsername: 1 }
-        ).lean();
+        const userFollowings =
+            followings.length > 0
+                ? await User.find(
+                    { leetcodeUsernameLower: { $in: followings } },
+                    { _id: 1, leetcodeUsername: 1 }
+                ).lean()
+                : [];
 
-        const followingUserIds = [...new Set(
-            userFollowings.map((id) => id._id)
-        )];
+
+        const followingUserIds = [
+            currentUserObjectId,
+            ...new Set(userFollowings.map((user) => user._id)),
+        ];
         
-        if (followingUserIds.length === 0) {
-            return res.status(200).json({
-                success: true,
-                currentUserId,
-                submissions: [],
-            });
-        }
         // get last 20 submissions from each user, store them in one array arrange in chronological descending order, display them
         // const submissions = await lc_submission_events.find(
         //     { userId: { $in: followingUserIds } },
