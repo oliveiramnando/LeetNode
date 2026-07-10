@@ -175,7 +175,6 @@ export const getFollowers = async (req,res) => {
             createdAt: record.createdAt,
         }));
 
-        console.log("Followers:", followers);
         return res.status(200).json({
             success: true,
             message: "User Followers",
