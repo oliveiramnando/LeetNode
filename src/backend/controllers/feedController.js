@@ -3,6 +3,48 @@ import Friend from "../models/Friend.js";
 import lc_submission_events from "../models/submissions/lc_submission_events.js";
 import Comment from "../models/SubmissionComments.js";
 import mongoose from "mongoose";
+import { getStreaksForUser } from "../utils/streakService.js";
+
+export const getUserStreaks = async (req, res) => {
+    try {
+        const currentUserId = req.session?.userId;
+        const currentLeetcodeUsername =
+            req.session?.leetcodeUsername;
+
+        if (!currentUserId) {
+            return res.status(401).json({
+                success: false,
+                message: "Please log in to view streaks",
+            });
+        }
+
+        if (!currentLeetcodeUsername) {
+            return res.status(400).json({
+                success: false,
+                message:
+                    "Please link your LeetCode account to view streaks",
+            });
+        }
+
+        const streaks = await getStreaksForUser(
+            currentUserId,
+            currentLeetcodeUsername
+        );
+
+        return res.status(200).json({
+            success: true,
+            streaks,
+        });
+    } catch (error) {
+        console.error(error);
+
+        return res.status(500).json({
+            success: false,
+            message: error.message,
+        });
+    }
+};
+
 
 export const submissionFeed = async (req,res) => {
     try {
