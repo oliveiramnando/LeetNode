@@ -1,7 +1,7 @@
 // components/FriendSearch.jsx
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 
 export default function FriendSearch() {
@@ -10,7 +10,6 @@ export default function FriendSearch() {
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("idle"); // idle | loading | error
   const [error, setError] = useState("");
-
 
   async function handleSearch(e) {
     e.preventDefault();
@@ -22,39 +21,41 @@ export default function FriendSearch() {
     setError("");
 
     try {
-      const res = await fetch(`/api/leetcode/user/${encodeURIComponent(username)}`, {
-        method: "GET",
-        headers: { "Accept": "application/json" },
-      });
+      const res = await fetch(
+        `/api/leetcode/user/${encodeURIComponent(username)}`,
+        {
+          method: "GET",
+          headers: { Accept: "application/json" },
+        }
+      );
 
       if (!res.ok) {
-        // Prefer backend message if present, but keep it safe/clean
         let msg = "User not found.";
+
         try {
           const data = await res.json();
           if (data?.error) msg = data.error;
           if (data?.message) msg = data.message;
         } catch {
-          // ignore JSON parse errors
+          // Ignore JSON parse errors.
         }
+
         setStatus("error");
         setError(msg);
         return;
       }
 
-      // Success → go to profile page
       router.push(`/profile/${encodeURIComponent(username)}`);
     } catch {
       setStatus("error");
       setError("Network error. Please try again.");
     } finally {
-      // If we navigated, the component may unmount; this is safe either way.
       setStatus((prev) => (prev === "loading" ? "idle" : prev));
     }
   }
 
   return (
-    <div className="flex flex-col">
+    <div className="relative flex flex-col">
       <form onSubmit={handleSearch} className="flex items-center gap-2">
         <div className="relative">
           <input
@@ -69,29 +70,30 @@ export default function FriendSearch() {
             }}
             placeholder="Search friends…"
             aria-label="Search friends"
-            className="h-9 w-56 rounded-md border border-white/10 bg-[#141414] px-3 pr-20 text-sm text-white placeholder:text-zinc-500 outline-none focus:border-white/20"
+            className="h-9 w-56 rounded-xl border border-white/10 bg-white/[0.04] px-3 pr-20 text-sm text-zinc-100 placeholder:text-zinc-500 outline-none transition focus:border-emerald-400/30 focus:bg-white/[0.06]"
           />
 
-          {status === "loading" && (
-            <div className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-zinc-400">
+          {status === "loading" ? (
+            <div className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-zinc-400">
               Searching…
             </div>
-          )}
+          ) : null}
         </div>
 
         <button
           type="submit"
           disabled={status === "loading" || !query.trim()}
-          className="h-9 rounded-md border border-white/10 bg-white/5 px-3 text-sm text-zinc-200 transition hover:bg-white/10 disabled:opacity-50 disabled:hover:bg-white/5"
+          className="h-9 rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-3 text-sm font-medium text-emerald-300 transition hover:border-emerald-400/30 hover:bg-emerald-500/[0.14] disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-emerald-500/10"
         >
           Search
         </button>
       </form>
 
-      {/* Inline error near search bar */}
-      {status === "error" && (
-        <p className="mt-1 text-xs text-red-400">{error}</p>
-      )}
+      {status === "error" ? (
+        <p className="absolute left-0 top-11 min-w-64 rounded-xl border border-rose-500/20 bg-rose-500/10 px-3 py-2 text-xs text-rose-300 shadow-[0_12px_30px_rgba(0,0,0,0.28)]">
+          {error}
+        </p>
+      ) : null}
     </div>
   );
 }
