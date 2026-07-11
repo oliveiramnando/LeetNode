@@ -147,7 +147,7 @@ export default function FriendStreaksCard({
         <div className="flex items-center justify-between gap-3">
           <div>
             <h2 className="text-sm font-semibold text-zinc-100">
-              Friend streaks
+              Streaks
             </h2>
             <p className="mt-1 text-xs text-zinc-500">
               Both solve each day to keep it alive.
