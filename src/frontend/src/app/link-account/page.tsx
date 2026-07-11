@@ -163,6 +163,11 @@ export default function LinkAccountPage() {
           . Enter your LeetCode username to finish setup.
         </p>
 
+        <div className="mt-6 rounded-xl border border-amber-400/25 bg-amber-400/10 p-4 text-sm text-amber-100">
+          <span className="font-semibold">Before continuing:</span> Make sure
+          your GitHub account is linked to your LeetCode account first.
+        </div>
+
         {error && (
           <div className="mt-6 rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200">
             {error}
@@ -190,8 +195,12 @@ export default function LinkAccountPage() {
             {submitting ? "Linking…" : "Link account"}
           </button>
 
-          <div className="text-xs text-zinc-400">
-            Tip: Your LeetCode username is the one in your profile URL.
+          <div className="space-y-1 text-xs text-zinc-400">
+            <p>Your LeetCode username is the one in your profile URL.</p>
+            <p>
+              Your GitHub account must already be linked in your LeetCode
+              account settings.
+            </p>
           </div>
         </form>
       </div>
