@@ -9,7 +9,7 @@ export function Card({
     <div
       className={[
         "rounded-2xl border border-white/10 bg-white/5 shadow-sm",
-        "backdrop-blur supports-[backdrop-filter]:bg-white/5",
+        // "backdrop-blur supports-[backdrop-filter]:bg-white/5",
         className,
       ].join(" ")}
     >
