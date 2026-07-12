@@ -11,7 +11,6 @@ export const friendLeaderboard = async (req, res) => {
         const userId = req.session?.userId;
         const currentLeetcodeUsername = req.session?.leetcodeUsernameLower;
 
-
         if (!userId) return res.status(401).json({ success:false, message: "Please log in" });
         if (!currentLeetcodeUsername) return res.status(400).json({ success:false, message: "LeetCode username not found" });
 
