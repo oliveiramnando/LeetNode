@@ -114,7 +114,7 @@ export async function updateFriendStreak(
                 },
             },
             {
-                new: true,
+                returnDocument: "after",
             }
         )
             .populate({
@@ -141,7 +141,7 @@ export async function updateFriendStreak(
             },
         },
         {
-            new: true,
+            returnDocument: "after",
         }
     )
         .populate({
