@@ -161,8 +161,12 @@ export const githubOAuthCallback = async (req, res) => {
 
 			req.session.userId = user._id;
 
+			if (user.leetcodeUsername) {
+				req.session.leetcodeUsername = user.leetcodeUsername;
+			}
+
 			if (user.leetcodeUsernameLower) {
-				req.session.leetcodeUsername = user.leetcodeUsernameLower;
+				req.session.leetcodeUsernameLower = user.leetcodeUsernameLower;
 			}
 
 			req.session.save((saveErr) => {
