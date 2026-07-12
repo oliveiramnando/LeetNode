@@ -2,6 +2,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import FriendLeaderboardCard from "./FriendLeaderboardCard";
 import FriendStreaksCard from "./FriendStreaksCard";
 import SubmissionFeedItem from "./SubmissionFeedItem";
 
@@ -178,13 +179,17 @@ export default function SubmissionFeed() {
   }, [loading, error, submissions, currentUserId]);
 
   return (
-    <section className="mx-auto grid w-full max-w-[1600px] min-w-0 items-start gap-8 xl:grid-cols-[minmax(0,1fr)_576px_minmax(0,1fr)]">
-      <div className="hidden xl:block" aria-hidden="true" />
+    <section className="mx-auto w-full max-w-[576px] min-w-0">
+      <aside className="fixed left-5 top-[55%] z-20 hidden w-[320px] -translate-y-1/2 xl:block 2xl:left-8 2xl:w-[360px]">
+        <div className="max-h-[calc(100vh-7rem)] overflow-y-auto overscroll-contain">
+          <FriendLeaderboardCard backend={backend} />
+        </div>
+      </aside>
 
-      <div className="w-full min-w-0">{content}</div>
+      <main className="w-full min-w-0">{content}</main>
 
-      <aside className="hidden w-[360px] justify-self-start xl:block">
-        <div className="fixed top-1/2 w-[360px] -translate-y-1/2">
+      <aside className="fixed right-5 top-1/2 z-20 hidden w-[320px] -translate-y-1/2 xl:block 2xl:right-8 2xl:w-[360px]">
+        <div className="max-h-[calc(100vh-7rem)] overflow-y-auto overscroll-contain">
           <FriendStreaksCard
             backend={backend}
             currentUserId={currentUserId}
