@@ -37,11 +37,6 @@ export const getUser = async (req,res) => {
         const { username } = req.params;
         const userId = req.session?.userId;
         const leetcodeUsernameLower = req.session?.leetcodeUsernameLower;
-
-        if (userId && leetcodeUsername && leetcodeUsername === String(username).toLowerCase()) {
-            const syncResult = await syncSubmissionsIfNeeded(userId, leetcodeUsername);
-        }
-
         const leetcode = new LeetCode();
         const user = await leetcode.user(username);
 
@@ -69,7 +64,7 @@ export const getUser = async (req,res) => {
                 },
                 {
                     upsert: true,
-                    new: true,
+                    returnDocument: "after",
                     setDefaultsOnInsert: true,
                 }
             );
