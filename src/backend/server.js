@@ -11,6 +11,7 @@ import friendRoutes from "./routes/friendRoutes.js";
 import submissionRoutes from "./routes/submissionRoutes.js";
 import tagRoutes from "./routes/tagRoutes.js";
 import feedRoutes from "./routes/feedRoutes.js";
+import leaderboardRoutes from "./routes/leaderboardRoutes.js";
 
 const PORT = process.env.PORT || 8080;
 const app = express();
@@ -29,6 +30,7 @@ app.use("/api/friend", friendRoutes);
 app.use("/api/submissions", submissionRoutes);
 app.use("/api/tags", tagRoutes);
 app.use("/api/feed", feedRoutes);
+app.use("/api/leaderboard", leaderboardRoutes);
 
 
 connectDB().then(() => {
