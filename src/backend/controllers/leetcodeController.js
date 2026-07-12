@@ -1,6 +1,7 @@
 import { LeetCode } from "leetcode-query";
 import User from "../models/User.js";
 import { syncSubmissionsIfNeeded } from "../utils/syncSubmissions.js";
+import lc_user_submission_stats from "../models/submissions/lc_user_submission_stats.js";
 
 
 function normalizeGithubUrl(url) {
@@ -35,7 +36,7 @@ export const getUser = async (req,res) => {
     try {
         const { username } = req.params;
         const userId = req.session?.userId;
-        const leetcodeUsername = req.session?.leetcodeUsername;
+        const leetcodeUsernameLower = req.session?.leetcodeUsernameLower;
 
         if (userId && leetcodeUsername && leetcodeUsername === String(username).toLowerCase()) {
             const syncResult = await syncSubmissionsIfNeeded(userId, leetcodeUsername);
@@ -44,6 +45,36 @@ export const getUser = async (req,res) => {
         const leetcode = new LeetCode();
         const user = await leetcode.user(username);
 
+        if (userId && leetcodeUsernameLower && leetcodeUsernameLower === String(username).toLowerCase()) {
+            await syncSubmissionsIfNeeded(userId, leetcodeUsernameLower);
+
+            const acceptedStats = user?.matchedUser?.submitStats?.acSubmissionNum ?? [];
+
+            const solvedByDifficulty = Object.fromEntries(
+                acceptedStats.map((stat) => [
+                    stat.difficulty,
+                    stat.count,
+                ])
+            );
+
+            await lc_user_submission_stats.findOneAndUpdate(
+                { userId },
+                {
+                    $set: {
+                        totalEasySubmissions: solvedByDifficulty.Easy ?? 0,
+                        totalMediumSubmissions: solvedByDifficulty.Medium ?? 0,
+                        totalHardSubmissions: solvedByDifficulty.Hard ?? 0,
+                        lastSubmissionAt: new Date(),
+                    },
+                },
+                {
+                    upsert: true,
+                    new: true,
+                    setDefaultsOnInsert: true,
+                }
+            );
+        } 
+        
         return res.json(user);
     } catch (error) {
         console.log(error);
@@ -114,9 +145,11 @@ export const linkLeetcode = async (req, res) => {
         
         user.leetcodeUsername = String(leetcodeUsername);
         user.leetcodeUsernameLower = String(leetcodeUsername).toLowerCase();
-        await user.save();
 
-        req.session.leetcodeUsername = user.leetcodeUsernameLower;
+        await user.save();
+        
+        req.session.leetcodeUsername = user.leetcodeUsername;
+        req.session.leetcodeUsernameLower = user.leetcodeUsernameLower;
 
         return res.status(200).json({
             success: true,
