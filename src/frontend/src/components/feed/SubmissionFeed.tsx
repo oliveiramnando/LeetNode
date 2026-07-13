@@ -179,21 +179,17 @@ export default function SubmissionFeed() {
   }, [loading, error, submissions, currentUserId]);
 
   return (
-    <section className="mx-auto w-full max-w-[576px] min-w-0">
-      <aside className="fixed left-5 top-[55%] z-20 hidden w-[320px] -translate-y-1/2 xl:block 2xl:left-8 2xl:w-[360px]">
-        <div className="max-h-[calc(100vh-7rem)] overflow-y-auto overscroll-contain">
-          <FriendLeaderboardCard backend={backend} />
-        </div>
-      </aside>
+    <section className="w-full min-w-0 xl:pr-[440px]">
+      <main className="w-full min-w-0 xl:max-w-[640px]">{content}</main>
 
-      <main className="w-full min-w-0">{content}</main>
-
-      <aside className="fixed right-5 top-1/2 z-20 hidden w-[320px] -translate-y-1/2 xl:block 2xl:right-8 2xl:w-[360px]">
-        <div className="max-h-[calc(100vh-7rem)] overflow-y-auto overscroll-contain">
+      <aside className="fixed right-8 top-28 z-20 hidden w-[400px] xl:block">
+        <div className="flex max-h-[calc(100vh-8rem)] flex-col gap-5 overflow-y-auto overscroll-contain pr-1">
           <FriendStreaksCard
             backend={backend}
             currentUserId={currentUserId}
           />
+
+          <FriendLeaderboardCard backend={backend} />
         </div>
       </aside>
     </section>
