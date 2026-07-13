@@ -180,10 +180,8 @@ export default function SubmissionFeed() {
 
   return (
     <section className="w-full min-w-0 xl:pr-[440px]">
-      <main className="w-full min-w-0 xl:max-w-[640px]">{content}</main>
-
-      <aside className="fixed right-8 top-28 z-20 hidden w-[400px] xl:block">
-        <div className="flex max-h-[calc(100vh-8rem)] flex-col gap-5 overflow-y-auto overscroll-contain pr-1">
+      <aside className="mb-5 w-full xl:fixed xl:right-8 xl:top-28 xl:z-20 xl:mb-0 xl:w-[400px]">
+        <div className="flex flex-col gap-5 xl:max-h-[calc(100vh-8rem)] xl:overflow-y-auto xl:overscroll-contain xl:pr-1">
           <FriendStreaksCard
             backend={backend}
             currentUserId={currentUserId}
@@ -192,6 +190,8 @@ export default function SubmissionFeed() {
           <FriendLeaderboardCard backend={backend} />
         </div>
       </aside>
+
+      <main className="w-full min-w-0 xl:max-w-[640px]">{content}</main>
     </section>
   );
 }

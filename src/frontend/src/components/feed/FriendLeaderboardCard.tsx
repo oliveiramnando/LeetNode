@@ -16,7 +16,7 @@ type LeaderboardEntry = {
 type LeaderboardResponse =
   | {
       success: true;
-      topFive: LeaderboardEntry[];
+      topThree: LeaderboardEntry[];
       currentUser: LeaderboardEntry | null;
       totalParticipants: number;
     }
@@ -93,7 +93,7 @@ function rankClasses(rank: number) {
 export default function FriendLeaderboardCard({
   backend,
 }: FriendLeaderboardCardProps) {
-  const [topFive, setTopFive] = useState<LeaderboardEntry[]>([]);
+  const [topThree, setTopThree] = useState<LeaderboardEntry[]>([]);
   const [currentUser, setCurrentUser] = useState<LeaderboardEntry | null>(null);
   const [totalParticipants, setTotalParticipants] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -128,7 +128,7 @@ export default function FriendLeaderboardCard({
         }
 
         if (!ignore) {
-          setTopFive(Array.isArray(data.topFive) ? data.topFive : []);
+          setTopThree(Array.isArray(data.topThree) ? data.topThree : []);
           setCurrentUser(data.currentUser ?? null);
           setTotalParticipants(data.totalParticipants ?? 0);
         }
@@ -139,7 +139,7 @@ export default function FriendLeaderboardCard({
               ? err.message
               : "Failed to load leaderboard",
           );
-          setTopFive([]);
+          setTopThree([]);
           setCurrentUser(null);
           setTotalParticipants(0);
         }
@@ -155,8 +155,8 @@ export default function FriendLeaderboardCard({
     };
   }, [backend]);
 
-  const currentUserIsTopFive = currentUser
-    ? topFive.some((entry) => entry.userId === currentUser.userId)
+  const currentUserIsTopThree = currentUser
+    ? topThree.some((entry) => entry.userId === currentUser.userId)
     : false;
 
   return (
@@ -191,7 +191,7 @@ export default function FriendLeaderboardCard({
           </div>
         ) : null}
 
-        {!loading && !error && topFive.length === 0 ? (
+        {!loading && !error && topThree.length === 0 ? (
           <div className="px-5 py-7 text-center">
             <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full border border-white/[0.08] bg-white/[0.03] text-zinc-500">
               <TrophyIcon />
@@ -205,9 +205,9 @@ export default function FriendLeaderboardCard({
           </div>
         ) : null}
 
-        {!loading && !error && topFive.length > 0 ? (
+        {!loading && !error && topThree.length > 0 ? (
           <div className="space-y-2 px-3">
-            {topFive.map((entry) => (
+            {topThree.map((entry) => (
               <div
                 key={entry.userId}
                 className="flex items-center gap-3 rounded-xl border border-white/[0.06] bg-[#0d0e10] p-3 transition hover:border-emerald-500/15 hover:bg-emerald-500/[0.025]"
@@ -240,7 +240,7 @@ export default function FriendLeaderboardCard({
           </div>
         ) : null}
 
-        {!loading && !error && currentUser && !currentUserIsTopFive ? (
+        {!loading && !error && currentUser && !currentUserIsTopThree ? (
           <div className="mx-3 mt-3 border-t border-white/[0.07] pt-3">
             <div className="flex items-center gap-3 rounded-xl border border-emerald-500/15 bg-emerald-500/[0.04] p-3">
               <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-emerald-500/20 bg-emerald-500/[0.08] text-xs font-semibold text-emerald-300">

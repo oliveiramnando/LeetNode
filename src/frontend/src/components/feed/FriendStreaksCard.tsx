@@ -161,7 +161,7 @@ export default function FriendStreaksCard({
         </div>
       </div>
 
-      <div className="max-h-[calc(100vh-11rem)] overflow-y-auto overscroll-contain py-4">
+      <div className="max-h-[228px] overflow-y-auto overscroll-contain py-4">
         {loading ? <LoadingRows /> : null}
 
         {!loading && error ? (
