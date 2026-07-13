@@ -8,6 +8,25 @@ import FriendSearch from "./FriendSearch";
 import ProfileButton from "./ProfileButton";
 import { useAuth } from "./auth/AuthProvider";
 
+function HomeIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      fill="none"
+      className="h-5 w-5"
+    >
+      <path
+        d="M3 10.75 12 3l9 7.75v8.5A1.75 1.75 0 0 1 19.25 21h-4.5v-6.25h-5.5V21h-4.5A1.75 1.75 0 0 1 3 19.25v-8.5Z"
+        stroke="currentColor"
+        strokeWidth="1.7"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 export default function Navbar() {
   const router = useRouter();
   const backend = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8080";
@@ -30,12 +49,13 @@ export default function Navbar() {
   };
 
   const startOAuth = `${backend}/api/auth/github/start`;
+  const homeHref = loggedIn ? "/feed" : "/";
 
   return (
     <header className="sticky top-0 z-50 border-b border-white/10 bg-zinc-950/80 backdrop-blur supports-[backdrop-filter]:bg-zinc-950/65">
       <Container className="flex min-h-16 items-center justify-between gap-4">
         <div className="flex min-w-0 items-center gap-4">
-          <Link href="/" className="group inline-flex items-center gap-2">
+          <Link href={homeHref} className="group inline-flex items-center gap-2">
             <span className="flex h-8 w-8 items-center justify-center rounded-xl border border-emerald-500/20 bg-emerald-500/10 text-sm font-semibold text-emerald-300 transition group-hover:border-emerald-400/30 group-hover:bg-emerald-500/[0.14]">
               L
             </span>
@@ -73,9 +93,11 @@ export default function Navbar() {
             <>
               <Link
                 href="/feed"
-                className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 font-medium text-zinc-200 transition hover:bg-white/[0.07] hover:text-white"
+                aria-label="Home"
+                title="Home"
+                className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-zinc-200 transition hover:bg-white/[0.07] hover:text-white"
               >
-                Feed
+                <HomeIcon />
               </Link>
 
               {user?.leetcodeUsername ? (
