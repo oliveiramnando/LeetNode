@@ -71,8 +71,8 @@ export const friendLeaderboard = async (req, res) => {
             })
         );
 
-        const topFive =
-            rankedLeaderboard.slice(0, 5);
+        const topThree =
+            rankedLeaderboard.slice(0, 3);
 
         const currentUserEntry =
             rankedLeaderboard.find(
@@ -83,7 +83,7 @@ export const friendLeaderboard = async (req, res) => {
 
         return res.status(200).json({
             success: true,
-            topFive,
+            topThree,
             currentUser: currentUserEntry,
             totalParticipants:
                 rankedLeaderboard.length,
