@@ -185,6 +185,12 @@ Production deployments require updated environment variables, OAuth callback URL
 * Performance improvements
 * Browser extension synchronization
 
+## Disclaimer
+
+LeetNode is an independent project and is not affiliated with, endorsed by,
+or sponsored by LeetCode. LeetCode and its associated trademarks are the
+property of their respective owners.
+
 ## Author
 
 **Fernando Oliveira**
